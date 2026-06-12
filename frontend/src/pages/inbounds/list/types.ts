@@ -16,6 +16,7 @@ export type ProtocolFlags = {
   isHTTP?: boolean;
   isWireguard?: boolean;
   isTunnel?: boolean;
+  isBalancer?: boolean;
 };
 
 export interface DBInboundRecord extends ProtocolFlags {
@@ -46,6 +47,7 @@ export interface ClientCountEntry {
 
 export type RowAction =
   | 'edit'
+  | 'editBalancer'
   | 'showInfo'
   | 'qrcode'
   | 'export'
@@ -56,7 +58,7 @@ export type RowAction =
   | 'delAllClients'
   | 'clone';
 
-export type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds';
+export type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds' | 'createBalancer';
 
 export interface InboundListProps {
   dbInbounds: DBInboundRecord[];
@@ -71,6 +73,7 @@ export interface InboundListProps {
   nodesById: Map<number, NodeRecord>;
   hasActiveNode: boolean;
   onAddInbound: () => void;
+  onCreateBalancer: () => void;
   onGeneralAction: (key: GeneralAction) => void;
   onRowAction: (action: { key: RowAction; dbInbound: DBInboundRecord }) => void;
   onBulkDelete: (ids: number[]) => Promise<boolean>;

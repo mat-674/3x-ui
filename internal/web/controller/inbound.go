@@ -69,6 +69,9 @@ func (a *InboundController) initRouter(g *gin.RouterGroup) {
 	g.GET("/:id/fallbacks", a.getFallbacks)
 
 	g.POST("/add", a.addInbound)
+	g.POST("/balancer/add", a.addBalancer)
+	g.POST("/balancer/update/:id", a.updateBalancer)
+	g.POST("/balancer/memberSubs", a.balancerMemberSubs)
 	g.POST("/del/:id", a.delInbound)
 	g.POST("/bulkDel", a.bulkDelInbounds)
 	g.POST("/update/:id", a.updateInbound)
@@ -159,6 +162,67 @@ func (a *InboundController) addInbound(c *gin.Context) {
 	}
 	a.broadcastInboundsUpdate(user.Id)
 	notifyClientsChanged()
+}
+
+// addBalancer creates a balancer inbound — a panel-only grouping of several
+// real inbounds that the JSON subscription emits as one leastPing-balanced
+// profile. It never runs on xray, so no restart is signalled.
+func (a *InboundController) addBalancer(c *gin.Context) {
+	inbound, ok := middleware.BindAndValidate[model.Inbound](c)
+	if !ok {
+		return
+	}
+	user := session.GetLoginUser(c)
+	inbound.UserId = user.Id
+
+	inbound, err := a.inboundService.AddBalancer(inbound)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonMsgObj(c, I18nWeb(c, "pages.inbounds.toasts.inboundCreateSuccess"), inbound, nil)
+	a.broadcastInboundsUpdate(user.Id)
+}
+
+// balancerMemberSubs returns the candidate subscription IDs present on the
+// posted member inbounds, for the balancer's "selected" visibility picker.
+func (a *InboundController) balancerMemberSubs(c *gin.Context) {
+	var req struct {
+		MemberIds []int `json:"memberIds"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	user := session.GetLoginUser(c)
+	subs, err := a.inboundService.BalancerMemberSubs(user.Id, req.MemberIds)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonObj(c, subs, nil)
+}
+
+// updateBalancer rewrites an existing balancer's members/probe/remark.
+func (a *InboundController) updateBalancer(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.inboundUpdateSuccess"), err)
+		return
+	}
+	inbound := &model.Inbound{Id: id}
+	if !middleware.BindAndValidateInto(c, inbound) {
+		return
+	}
+	user := session.GetLoginUser(c)
+
+	inbound, err = a.inboundService.UpdateBalancer(inbound)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonMsgObj(c, I18nWeb(c, "pages.inbounds.toasts.inboundUpdateSuccess"), inbound, nil)
+	a.broadcastInboundsUpdate(user.Id)
 }
 
 // delInbound deletes an inbound configuration by its ID.

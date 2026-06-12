@@ -171,6 +171,10 @@ export class DBInbound {
         return this.protocol === Protocols.TUNNEL;
     }
 
+    get isBalancer() {
+        return this.protocol === Protocols.BALANCER;
+    }
+
     get address(): string {
         let address = location.hostname;
         if (!ObjectUtil.isEmpty(this.listen) && this.listen !== "0.0.0.0") {

@@ -80,6 +80,16 @@ export function isInboundMultiUser(record: { protocol: string; settings: unknown
   }
 }
 
+// readBalancerMembers extracts the member inbound IDs from a balancer's
+// settings JSON ({"balancer":{"members":[...]}}). Returns [] for non-balancers
+// or malformed settings.
+export function readBalancerMembers(settings: unknown): number[] {
+  const parsed = coerceInboundJsonField(settings) as { balancer?: { members?: unknown } };
+  const members = parsed.balancer?.members;
+  if (!Array.isArray(members)) return [];
+  return members.filter((m): m is number => typeof m === 'number');
+}
+
 export function showQrCodeMenu(dbInbound: DBInboundRecord): boolean {
   if (dbInbound.isWireguard) return true;
   if (dbInbound.isSS) {

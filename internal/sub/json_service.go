@@ -84,6 +84,20 @@ func (s *SubJsonService) GetJson(subId string, host string) (string, string, err
 		}
 	}
 
+	// Append one balanced config per enabled balancer. A balancer groups
+	// several real inbounds into a single leastPing-balanced profile that
+	// shows up alongside the regular per-node entries.
+	for _, balancer := range s.SubService.getEnabledBalancers() {
+		settings, err := model.ParseBalancerSettings(balancer.Settings)
+		if err != nil || len(settings.Members) == 0 {
+			continue
+		}
+		members := s.SubService.getInboundsByIds(settings.Members)
+		if raw, ok := s.getBalancerConfig(balancer, members, subId, host); ok {
+			configArray = append(configArray, raw)
+		}
+	}
+
 	if len(configArray) == 0 {
 		return "", "", nil
 	}
@@ -106,8 +120,19 @@ func (s *SubJsonService) GetJson(subId string, host string) (string, string, err
 	return string(finalJson), header, nil
 }
 
-func (s *SubJsonService) getConfig(inbound *model.Inbound, client model.Client, host string) []json_util.RawMessage {
-	var newJsonArray []json_util.RawMessage
+// outboundVariant is one proxy outbound (tag "proxy") plus the remark to use
+// for the config that wraps it. An inbound with several External Proxy entries
+// yields several variants.
+type outboundVariant struct {
+	raw    json_util.RawMessage
+	remark string
+}
+
+// buildOutboundVariants turns one (inbound, client) pair into the proxy
+// outbound(s) it produces — one per External Proxy entry, or a single synthetic
+// one when none is configured. Shared by the per-inbound config builder and the
+// balancer builder so both honour the same stream/TLS/external-proxy handling.
+func (s *SubJsonService) buildOutboundVariants(inbound *model.Inbound, client model.Client, host string) []outboundVariant {
 	stream := s.streamData(inbound.StreamSettings)
 
 	// When externalProxy is empty the JSON config falls back to a
@@ -135,6 +160,7 @@ func (s *SubJsonService) getConfig(inbound *model.Inbound, client model.Client, 
 
 	delete(stream, "externalProxy")
 
+	var variants []outboundVariant
 	for _, ep := range externalProxies {
 		extPrxy := ep.(map[string]any)
 		inbound.Listen = extPrxy["dest"].(string)
@@ -158,31 +184,166 @@ func (s *SubJsonService) getConfig(inbound *model.Inbound, client model.Client, 
 		}
 		streamSettings, _ := json.MarshalIndent(newStream, "", "  ")
 
-		var newOutbounds []json_util.RawMessage
-
+		var raw json_util.RawMessage
 		switch inbound.Protocol {
 		case "vmess":
-			newOutbounds = append(newOutbounds, s.genVnext(inbound, streamSettings, client))
+			raw = s.genVnext(inbound, streamSettings, client)
 		case "vless":
-			newOutbounds = append(newOutbounds, s.genVless(inbound, streamSettings, client))
+			raw = s.genVless(inbound, streamSettings, client)
 		case "trojan", "shadowsocks":
-			newOutbounds = append(newOutbounds, s.genServer(inbound, streamSettings, client))
+			raw = s.genServer(inbound, streamSettings, client)
 		case "hysteria":
-			newOutbounds = append(newOutbounds, s.genHy(inbound, newStream, client))
+			raw = s.genHy(inbound, newStream, client)
+		default:
+			continue
 		}
 
-		newOutbounds = append(newOutbounds, s.defaultOutbounds...)
+		variants = append(variants, outboundVariant{
+			raw:    raw,
+			remark: s.SubService.genRemark(inbound, client.Email, extPrxy["remark"].(string)),
+		})
+	}
+	return variants
+}
+
+func (s *SubJsonService) getConfig(inbound *model.Inbound, client model.Client, host string) []json_util.RawMessage {
+	var newJsonArray []json_util.RawMessage
+	for _, variant := range s.buildOutboundVariants(inbound, client, host) {
+		newOutbounds := append([]json_util.RawMessage{variant.raw}, s.defaultOutbounds...)
 		newConfigJson := make(map[string]any)
 		maps.Copy(newConfigJson, s.configJson)
 
 		newConfigJson["outbounds"] = newOutbounds
-		newConfigJson["remarks"] = s.SubService.genRemark(inbound, client.Email, extPrxy["remark"].(string))
+		newConfigJson["remarks"] = variant.remark
 
 		newConfig, _ := json.MarshalIndent(newConfigJson, "", "  ")
 		newJsonArray = append(newJsonArray, newConfig)
 	}
 
 	return newJsonArray
+}
+
+// getBalancerConfig emits one JSON config that load-balances across the
+// balancer's member inbounds. Each member (where the subId's client exists)
+// contributes one or more proxy-N outbounds; an xray balancer with the
+// leastPing strategy plus an observatory selects between them on the client.
+// Returns false when fewer than two outbounds materialize — a balancer needs at
+// least two endpoints to balance, otherwise the member already appears on its
+// own alongside.
+func (s *SubJsonService) getBalancerConfig(balancer *model.Inbound, members []*model.Inbound, subId string, host string) (json_util.RawMessage, bool) {
+	settings, err := model.ParseBalancerSettings(balancer.Settings)
+	if err != nil {
+		return nil, false
+	}
+
+	// A "selected" balancer is gated to its allow-listed subscription IDs
+	// before any outbound is built.
+	if !settings.VisibleTo(subId) {
+		return nil, false
+	}
+
+	var outbounds []json_util.RawMessage
+	var firstEmail string
+	idx := 0
+	for _, member := range members {
+		if member == nil || !member.Enable || member.Protocol == model.Balancer {
+			continue
+		}
+		clients := s.SubService.matchingClients(member, subId)
+		if len(clients) == 0 {
+			continue
+		}
+		s.SubService.projectThroughFallbackMaster(member)
+		for _, client := range clients {
+			for _, variant := range s.buildOutboundVariants(member, client, host) {
+				idx++
+				tag := fmt.Sprintf("proxy-%d", idx)
+				outbounds = append(outbounds, retagOutbound(variant.raw, tag))
+				if firstEmail == "" {
+					firstEmail = client.Email
+				}
+			}
+		}
+	}
+
+	if len(outbounds) < 2 {
+		return nil, false
+	}
+
+	cfg := deepCopyConfigMap(s.configJson)
+	cfg["outbounds"] = append(outbounds, s.defaultOutbounds...)
+	remark := s.SubService.genRemark(balancer, firstEmail, "")
+	if remark == "" {
+		remark = balancer.Tag
+	}
+	cfg["remarks"] = remark
+
+	const balancerTag = "balancer"
+	if routing, ok := cfg["routing"].(map[string]any); ok {
+		routing["balancers"] = []any{
+			map[string]any{
+				"tag":      balancerTag,
+				"selector": []string{"proxy-"},
+				"strategy": map[string]any{"type": "leastPing"},
+			},
+		}
+		// Point any rule that targeted the single "proxy" outbound at the
+		// balancer instead, so all matched traffic is load-balanced.
+		if rules, ok := routing["rules"].([]any); ok {
+			for _, r := range rules {
+				rule, ok := r.(map[string]any)
+				if !ok {
+					continue
+				}
+				if rule["outboundTag"] == "proxy" {
+					delete(rule, "outboundTag")
+					rule["balancerTag"] = balancerTag
+				}
+			}
+		}
+	}
+	cfg["observatory"] = map[string]any{
+		"subjectSelector": []string{"proxy-"},
+		"probeURL":        settings.ProbeURL,
+		"probeInterval":   settings.ProbeInterval,
+	}
+
+	raw, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return nil, false
+	}
+	return raw, true
+}
+
+// retagOutbound rewrites an outbound's "tag" field. The protocol generators all
+// emit tag "proxy"; the balancer needs each member endpoint under a distinct
+// proxy-N tag so the selector can rank them.
+func retagOutbound(raw json_util.RawMessage, tag string) json_util.RawMessage {
+	var ob map[string]any
+	if err := json.Unmarshal(raw, &ob); err != nil {
+		return raw
+	}
+	ob["tag"] = tag
+	out, err := json.MarshalIndent(ob, "", "  ")
+	if err != nil {
+		return raw
+	}
+	return out
+}
+
+// deepCopyConfigMap clones the parsed template config so per-balancer mutations
+// (routing.balancers, observatory, rewritten rules) don't bleed into the shared
+// service template or other configs in the same response.
+func deepCopyConfigMap(m map[string]any) map[string]any {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return map[string]any{}
+	}
+	var out map[string]any
+	if err := json.Unmarshal(b, &out); err != nil {
+		return map[string]any{}
+	}
+	return out
 }
 
 func (s *SubJsonService) streamData(stream string) map[string]any {

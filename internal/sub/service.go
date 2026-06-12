@@ -291,6 +291,48 @@ func (s *SubService) getInboundsBySubId(subId string) ([]*model.Inbound, error) 
 	return inbounds, nil
 }
 
+// getEnabledBalancers returns every enabled balancer inbound, ordered the same
+// way as the regular sub list so balancer entries keep a stable position.
+func (s *SubService) getEnabledBalancers() []*model.Inbound {
+	db := database.GetDB()
+	var balancers []*model.Inbound
+	err := db.Model(model.Inbound{}).
+		Where("protocol = ? AND enable = ?", model.Balancer, true).
+		Order("sub_sort_index ASC").Order("id ASC").
+		Find(&balancers).Error
+	if err != nil {
+		logger.Warning("SubService - getEnabledBalancers:", err)
+		return nil
+	}
+	return balancers
+}
+
+// getInboundsByIds loads the member inbounds for a balancer, preserving the
+// order the ids were given so the subscription reflects the admin's chosen
+// member order.
+func (s *SubService) getInboundsByIds(ids []int) []*model.Inbound {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := database.GetDB()
+	var rows []*model.Inbound
+	if err := db.Model(model.Inbound{}).Preload("ClientStats").Where("id IN ?", ids).Find(&rows).Error; err != nil {
+		logger.Warning("SubService - getInboundsByIds:", err)
+		return nil
+	}
+	byId := make(map[int]*model.Inbound, len(rows))
+	for _, r := range rows {
+		byId[r.Id] = r
+	}
+	out := make([]*model.Inbound, 0, len(ids))
+	for _, id := range ids {
+		if ib, ok := byId[id]; ok {
+			out = append(out, ib)
+		}
+	}
+	return out
+}
+
 // projectThroughFallbackMaster mutates the inbound in place so its
 // Listen/Port/StreamSettings reflect the externally reachable master
 // when applicable. Covers both fallback mechanisms:

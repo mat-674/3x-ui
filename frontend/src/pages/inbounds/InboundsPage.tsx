@@ -26,6 +26,7 @@ import { createDefaultInboundSettings } from '@/lib/xray/inbound-defaults';
 import { genInboundLinks, preferPublicHost } from '@/lib/xray/inbound-link';
 import { inboundFromDb } from '@/lib/xray/inbound-from-db';
 import { coerceInboundJsonField, type DBInbound } from '@/models/dbinbound';
+import { Protocols } from '@/schemas/primitives';
 import { useTheme } from '@/hooks/useTheme';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -38,6 +39,7 @@ import { useInbounds } from './useInbounds';
 import { InboundList } from './list';
 import { LazyMount } from '@/components/utility';
 const InboundFormModal = lazy(() => import('./form/InboundFormModal'));
+const BalancerFormModal = lazy(() => import('./form/BalancerFormModal'));
 const InboundInfoModal = lazy(() => import('./info/InboundInfoModal'));
 const QrCodeModal = lazy(() => import('./qr/QrCodeModal'));
 const AttachClientsModal = lazy(() => import('./clients/AttachClientsModal'));
@@ -47,6 +49,7 @@ const AddClientsToGroupModal = lazy(() => import('./clients/AddClientsToGroupMod
 
 type RowAction =
   | 'edit'
+  | 'editBalancer'
   | 'showInfo'
   | 'qrcode'
   | 'export'
@@ -61,7 +64,7 @@ type RowAction =
   | 'addToGroup'
   | 'clone';
 
-type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds';
+type GeneralAction = 'import' | 'export' | 'subs' | 'resetInbounds' | 'createBalancer';
 
 interface ClientMatchTarget {
   id?: string;
@@ -124,6 +127,10 @@ export default function InboundsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [formDbInbound, setFormDbInbound] = useState<DBInbound | null>(null);
+
+  const [balancerOpen, setBalancerOpen] = useState(false);
+  const [balancerMode, setBalancerMode] = useState<'add' | 'edit'>('add');
+  const [balancerDbInbound, setBalancerDbInbound] = useState<DBInbound | null>(null);
 
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoDbInbound, setInfoDbInbound] = useState<DBInbound | null>(null);
@@ -350,6 +357,18 @@ export default function InboundsPage() {
     setFormOpen(true);
   }, []);
 
+  const onCreateBalancer = useCallback(() => {
+    setBalancerMode('add');
+    setBalancerDbInbound(null);
+    setBalancerOpen(true);
+  }, []);
+
+  const openBalancerEdit = useCallback((dbInbound: DBInbound) => {
+    setBalancerMode('edit');
+    setBalancerDbInbound(dbInbound);
+    setBalancerOpen(true);
+  }, []);
+
   const openEdit = useCallback((dbInbound: DBInbound) => {
     setFormMode('edit');
     setFormDbInbound(dbInbound);
@@ -477,6 +496,7 @@ export default function InboundsPage() {
       case 'import': importInbound(); break;
       case 'export': exportAllLinks(); break;
       case 'subs': exportAllSubs(); break;
+      case 'createBalancer': onCreateBalancer(); break;
       case 'resetInbounds':
         modal.confirm({
           title: t('pages.inbounds.resetAllTrafficTitle'),
@@ -491,12 +511,19 @@ export default function InboundsPage() {
       default:
         messageApi.info(`General action "${key}" — coming in a later 5f subphase`);
     }
-  }, [modal, importInbound, exportAllLinks, exportAllSubs, refresh, messageApi, t]);
+  }, [modal, importInbound, exportAllLinks, exportAllSubs, onCreateBalancer, refresh, messageApi, t]);
 
   const onRowAction = useCallback(async ({ key, dbInbound }: { key: RowAction; dbInbound: DBInbound }) => {
     // Actions that touch per-client secrets (uuid, password, flow, ...) need
     // the full payload that the slim list view does not ship. Hydrate first
     // and then operate on the rehydrated record.
+    // Balancers carry no per-client secrets and aren't real xray inbounds, so
+    // both the edit pencil and the explicit editBalancer action open the
+    // dedicated balancer modal instead of the inbound form.
+    if (dbInbound.protocol === Protocols.BALANCER && (key === 'edit' || key === 'editBalancer')) {
+      openBalancerEdit(dbInbound);
+      return;
+    }
     const hydratingKeys: RowAction[] = ['edit', 'showInfo', 'qrcode', 'export', 'subs', 'clipboard', 'clone', 'attachClients', 'addToGroup'];
     let target = dbInbound;
     if (hydratingKeys.includes(key)) {
@@ -556,7 +583,7 @@ export default function InboundsPage() {
       default:
         messageApi.info(`Action "${key}" — coming in a later 5f subphase`);
     }
-  }, [hydrateInbound, openEdit, checkFallback, findClientIndex, exportInboundLinks, exportInboundSubs, exportInboundClipboard, confirmDelete, confirmResetTraffic, confirmDelAllClients, confirmClone, messageApi]);
+  }, [hydrateInbound, openEdit, openBalancerEdit, checkFallback, findClientIndex, exportInboundLinks, exportInboundSubs, exportInboundClipboard, confirmDelete, confirmResetTraffic, confirmDelAllClients, confirmClone, messageApi]);
 
   return (
     <ConfigProvider theme={antdThemeConfig}>
@@ -621,6 +648,7 @@ export default function InboundsPage() {
                       nodesById={nodesById}
                       hasActiveNode={showNodeInfo}
                       onAddInbound={onAddInbound}
+                      onCreateBalancer={onCreateBalancer}
                       onGeneralAction={onGeneralAction}
                       onRowAction={({ key, dbInbound }) => onRowAction({ key, dbInbound: dbInbound as unknown as DBInbound })}
                       onBulkDelete={confirmBulkDelete}
@@ -641,6 +669,16 @@ export default function InboundsPage() {
             dbInbound={formDbInbound}
             dbInbounds={dbInbounds}
             availableNodes={nodesList}
+          />
+        </LazyMount>
+        <LazyMount when={balancerOpen}>
+          <BalancerFormModal
+            open={balancerOpen}
+            mode={balancerMode}
+            dbInbound={balancerDbInbound}
+            dbInbounds={dbInbounds}
+            onClose={() => setBalancerOpen(false)}
+            onSaved={refresh}
           />
         </LazyMount>
         <LazyMount when={infoOpen}>

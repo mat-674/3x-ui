@@ -28,6 +28,14 @@ interface RowActionsMenuProps {
 
 export function buildRowActionsMenu({ record, subEnable, t, isMobile, hasClients }: { record: DBInboundRecord; subEnable: boolean; t: (k: string) => string; isMobile?: boolean; hasClients?: boolean }): MenuProps['items'] {
   const items: MenuProps['items'] = [];
+  // Balancers are panel-only grouping rows: only edit + delete apply.
+  if (record.isBalancer) {
+    if (isMobile) {
+      items.push({ key: 'edit', icon: <EditOutlined />, label: t('edit') });
+    }
+    items.push({ key: 'delete', icon: <DeleteOutlined />, danger: true, label: t('delete') });
+    return items;
+  }
   if (isMobile) {
     items.push({ key: 'edit', icon: <EditOutlined />, label: t('edit') });
   }

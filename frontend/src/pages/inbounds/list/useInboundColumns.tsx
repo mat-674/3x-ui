@@ -16,6 +16,7 @@ import {
   shadowsocksNetworkLabel,
   tunnelNetworkLabel,
   mixedNetworkLabel,
+  readBalancerMembers,
 } from './helpers';
 import type { ClientCountEntry, DBInboundRecord, RowAction } from './types';
 
@@ -136,6 +137,7 @@ export function useInboundColumns({
         key: 'port',
         align: 'center',
         width: 40,
+        render: (_, record) => (record.isBalancer ? '—' : record.port),
       },
       {
         title: t('pages.inbounds.protocol'),
@@ -143,6 +145,15 @@ export function useInboundColumns({
         align: 'left',
         width: 130,
         render: (_, record) => {
+          if (record.isBalancer) {
+            const members = readBalancerMembers(record.settings);
+            return (
+              <div className="protocol-tags">
+                <Tag color="gold">{t('pages.inbounds.balancer.tag')}</Tag>
+                <Tag color="geekblue">{t('pages.inbounds.balancer.memberCount', { count: members.length })}</Tag>
+              </div>
+            );
+          }
           const tags: ReactElement[] = [<Tag key="p" color="purple">{record.protocol}</Tag>];
           if (record.isWireguard || record.isHysteria) {
             tags.push(<Tag key="n" color="green">UDP</Tag>);

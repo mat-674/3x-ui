@@ -22,6 +22,7 @@ import {
   ReloadOutlined,
   InfoCircleOutlined,
   DeleteOutlined,
+  ClusterOutlined,
 } from '@ant-design/icons';
 
 import { HttpUtil } from '@/utils';
@@ -44,6 +45,7 @@ export default function InboundList({
   nodesById,
   hasActiveNode,
   onAddInbound,
+  onCreateBalancer,
   onGeneralAction,
   onRowAction,
   onBulkDelete,
@@ -156,6 +158,11 @@ export default function InboundList({
           <Button type="primary" onClick={onAddInbound} icon={<PlusOutlined />}>
             {!isMobile && t('pages.inbounds.addInbound')}
           </Button>
+          <Tooltip title={t('pages.inbounds.balancer.createTitle')}>
+            <Button onClick={onCreateBalancer} icon={<ClusterOutlined />}>
+              {!isMobile && t('pages.inbounds.balancer.create')}
+            </Button>
+          </Tooltip>
           <Dropdown trigger={['click']} menu={generalActionsMenu}>
             <Button type="primary" icon={<MenuOutlined />}>
               {!isMobile && t('pages.inbounds.generalActions')}

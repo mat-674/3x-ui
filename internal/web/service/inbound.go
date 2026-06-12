@@ -633,7 +633,9 @@ func (s *InboundService) DelInbound(id int) (bool, error) {
 	var ib model.Inbound
 	loadErr := db.Model(model.Inbound{}).Where("id = ?", id).First(&ib).Error
 	if loadErr == nil {
-		shouldPushToRuntime := ib.NodeID != nil || ib.Enable
+		// Balancers never run on xray, so skip the runtime push and just
+		// drop the row (its client_inbounds mapping is empty anyway).
+		shouldPushToRuntime := ib.Protocol != model.Balancer && (ib.NodeID != nil || ib.Enable)
 		if shouldPushToRuntime {
 			rt, push, dirty, perr := s.nodePushPlan(&ib)
 			if perr != nil {
@@ -756,6 +758,12 @@ func (s *InboundService) SetInboundEnable(id int, enable bool) (bool, error) {
 		return false, err
 	}
 	inbound.Enable = enable
+
+	// Balancers don't run on xray; flipping their enable flag only changes
+	// whether they appear in the JSON subscription. No runtime sync, no restart.
+	if inbound.Protocol == model.Balancer {
+		return false, nil
+	}
 
 	needRestart := false
 	rt, push, dirty, perr := s.nodePushPlan(inbound)

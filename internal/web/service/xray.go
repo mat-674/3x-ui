@@ -135,6 +135,11 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		if inbound.Protocol == model.MTProto {
 			continue
 		}
+		// Balancers are panel-only grouping rows for the JSON subscription;
+		// they never run on xray-core.
+		if inbound.Protocol == model.Balancer {
+			continue
+		}
 		settings := map[string]any{}
 		json.Unmarshal([]byte(inbound.Settings), &settings)
 

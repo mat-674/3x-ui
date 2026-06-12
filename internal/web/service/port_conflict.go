@@ -127,6 +127,11 @@ func (d *portConflictDetail) String() string {
 }
 
 func (s *InboundService) checkPortConflict(inbound *model.Inbound, ignoreId int) (*portConflictDetail, error) {
+	// Balancers are panel-only grouping rows with no real listen socket, so
+	// they neither own nor conflict for a port.
+	if inbound.Protocol == model.Balancer {
+		return nil, nil
+	}
 	db := database.GetDB()
 
 	var candidates []*model.Inbound
@@ -140,6 +145,9 @@ func (s *InboundService) checkPortConflict(inbound *model.Inbound, ignoreId int)
 
 	newBits := inboundTransports(inbound.Protocol, inbound.StreamSettings, inbound.Settings)
 	for _, c := range candidates {
+		if c.Protocol == model.Balancer {
+			continue
+		}
 		if !sameNode(c.NodeID, inbound.NodeID) {
 			continue
 		}

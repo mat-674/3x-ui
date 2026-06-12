@@ -128,6 +128,137 @@ func TestSubJsonServiceVmessFlattened(t *testing.T) {
 	}
 }
 
+func TestSubJsonServiceBalancerConfig(t *testing.T) {
+	sub := NewSubService(false, "-io")
+	svc := NewSubJsonService("", "", "", sub)
+
+	balancer := &model.Inbound{
+		Id:       10,
+		Protocol: model.Balancer,
+		Remark:   "EU-LB",
+		Enable:   true,
+		Settings: (&model.BalancerSettings{Members: []int{1, 2}}).JSON(),
+	}
+	mkMember := func(id int, proto model.Protocol) *model.Inbound {
+		return &model.Inbound{
+			Id:             id,
+			Protocol:       proto,
+			Enable:         true,
+			Listen:         "1.2.3.4",
+			Port:           443,
+			StreamSettings: `{"network":"tcp","security":"none","tcpSettings":{"header":{"type":"none"}}}`,
+			Settings:       `{"encryption":"none","clients":[{"id":"uuid-` + string(rune('0'+id)) + `","email":"e` + string(rune('0'+id)) + `","subId":"sub1"}]}`,
+		}
+	}
+	members := []*model.Inbound{mkMember(1, model.VLESS), mkMember(2, model.VMESS)}
+
+	raw, ok := svc.getBalancerConfig(balancer, members, "sub1", "fallback.host")
+	if !ok {
+		t.Fatal("expected balancer config to be produced")
+	}
+
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("balancer config is not valid JSON: %v", err)
+	}
+
+	// Two proxy-N outbounds plus the default direct/block outbounds.
+	outbounds, _ := cfg["outbounds"].([]any)
+	tags := map[string]bool{}
+	for _, o := range outbounds {
+		ob, _ := o.(map[string]any)
+		if tag, _ := ob["tag"].(string); tag != "" {
+			tags[tag] = true
+		}
+	}
+	if !tags["proxy-1"] || !tags["proxy-2"] {
+		t.Fatalf("expected proxy-1 and proxy-2 outbounds, got tags %v", tags)
+	}
+	if tags["proxy"] {
+		t.Fatal("balancer outbounds must be retagged away from plain 'proxy'")
+	}
+
+	routing, _ := cfg["routing"].(map[string]any)
+	balancers, _ := routing["balancers"].([]any)
+	if len(balancers) != 1 {
+		t.Fatalf("expected exactly one balancer, got %d", len(balancers))
+	}
+	b0, _ := balancers[0].(map[string]any)
+	if b0["tag"] != "balancer" {
+		t.Fatalf("balancer tag = %v, want 'balancer'", b0["tag"])
+	}
+	strategy, _ := b0["strategy"].(map[string]any)
+	if strategy["type"] != "leastPing" {
+		t.Fatalf("balancer strategy = %v, want leastPing", strategy["type"])
+	}
+
+	rules, _ := routing["rules"].([]any)
+	foundBalancerRule := false
+	for _, r := range rules {
+		rule, _ := r.(map[string]any)
+		if rule["balancerTag"] == "balancer" {
+			foundBalancerRule = true
+			if _, hasOut := rule["outboundTag"]; hasOut {
+				t.Fatal("rule must not keep outboundTag once balancerTag is set")
+			}
+		}
+	}
+	if !foundBalancerRule {
+		t.Fatal("expected a routing rule pointing at the balancer")
+	}
+
+	obs, _ := cfg["observatory"].(map[string]any)
+	if obs == nil {
+		t.Fatal("expected an observatory for leastPing probing")
+	}
+	if obs["probeURL"] != model.DefaultBalancerProbeURL {
+		t.Fatalf("observatory probeURL = %v, want default", obs["probeURL"])
+	}
+}
+
+func TestSubJsonServiceBalancerVisibilitySelected(t *testing.T) {
+	sub := NewSubService(false, "-io")
+	svc := NewSubJsonService("", "", "", sub)
+
+	mkMember := func(id int, proto model.Protocol, email string) *model.Inbound {
+		return &model.Inbound{
+			Id: id, Protocol: proto, Enable: true, Listen: "1.2.3.4", Port: 443,
+			StreamSettings: `{"network":"tcp","security":"none","tcpSettings":{"header":{"type":"none"}}}`,
+			Settings:       `{"encryption":"none","clients":[{"id":"uuid-` + email + `","email":"` + email + `","subId":"sub1"}]}`,
+		}
+	}
+	members := []*model.Inbound{mkMember(1, model.VLESS, "alice"), mkMember(2, model.VMESS, "alice")}
+
+	// Selected, allow-list = [sub2] → sub1 must NOT see it.
+	hidden := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true,
+		Settings: (&model.BalancerSettings{Members: []int{1, 2}, Visibility: model.BalancerVisibilitySelected, SubIds: []string{"sub2"}}).JSON()}
+	if _, ok := svc.getBalancerConfig(hidden, members, "sub1", "h"); ok {
+		t.Fatal("selected balancer must be hidden from a subId not in its allow-list")
+	}
+
+	// Selected, allow-list = [sub1] → sub1 sees it.
+	shown := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true,
+		Settings: (&model.BalancerSettings{Members: []int{1, 2}, Visibility: model.BalancerVisibilitySelected, SubIds: []string{"sub1"}}).JSON()}
+	if _, ok := svc.getBalancerConfig(shown, members, "sub1", "h"); !ok {
+		t.Fatal("selected balancer must be visible to an allow-listed subId")
+	}
+}
+
+func TestSubJsonServiceBalancerNeedsTwoEndpoints(t *testing.T) {
+	sub := NewSubService(false, "-io")
+	svc := NewSubJsonService("", "", "", sub)
+
+	balancer := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true, Settings: (&model.BalancerSettings{Members: []int{1}}).JSON()}
+	member := &model.Inbound{
+		Id: 1, Protocol: model.VLESS, Enable: true, Listen: "1.2.3.4", Port: 443,
+		StreamSettings: `{"network":"tcp","security":"none","tcpSettings":{"header":{"type":"none"}}}`,
+		Settings:       `{"encryption":"none","clients":[{"id":"uuid-1","email":"e1","subId":"sub1"}]}`,
+	}
+	if _, ok := svc.getBalancerConfig(balancer, []*model.Inbound{member}, "sub1", "h"); ok {
+		t.Fatal("a single endpoint must not yield a balancer config")
+	}
+}
+
 func TestSubJsonServiceServerFlattened(t *testing.T) {
 	trojan := &model.Inbound{Listen: "1.2.3.4", Port: 443, Protocol: model.Trojan, Settings: `{}`}
 	client := model.Client{Password: "p4ss"}

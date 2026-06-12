@@ -12,6 +12,7 @@ export const ProtocolSchema = z.enum([
   'tunnel',
   'tun',
   'mtproto',
+  'balancer',
 ]);
 export type Protocol = z.infer<typeof ProtocolSchema>;
 
@@ -33,4 +34,7 @@ export const Protocols = Object.freeze({
   TUNNEL: 'tunnel',
   TUN: 'tun',
   MTPROTO: 'mtproto',
+  // Panel-only pseudo-protocol: groups several inbounds into one
+  // leastPing-balanced entry in the JSON subscription. Never runs on xray.
+  BALANCER: 'balancer',
 });
