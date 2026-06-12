@@ -227,7 +227,7 @@ export default function InboundInfoModal({
   const encryptionLabel = (inbound?.settings?.encryption as string) || '';
   const serverNameLabel = inbound?.serverName || '';
   const showClientTab = !!clientSettings;
-  const showSubscriptionTab = !!(subSettings?.enable && clientSettings?.subId);
+  const showSubscriptionTab = !!((subSettings?.enable || subSettings?.subJsonEnable) && clientSettings?.subId);
 
   if (!dbInbound || !inbound) {
     return (

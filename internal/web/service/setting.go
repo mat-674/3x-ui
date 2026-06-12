@@ -59,7 +59,7 @@ var defaultValueMap = map[string]string{
 	"twoFactorEnable":             "false",
 	"twoFactorToken":              "",
 	"subEnable":                   "true",
-	"subJsonEnable":               "false",
+	"subJsonEnable":               "true",
 	"subTitle":                    "",
 	"subSupportUrl":               "",
 	"subProfileUrl":               "",

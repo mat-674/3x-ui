@@ -130,7 +130,14 @@ export default function ClientInfoModal({
     return subSettings.subClashURI + client.subId;
   }, [client?.subId, subSettings?.subClashEnable, subSettings?.subClashURI]);
 
-  const showSubscription = !!(subSettings?.enable && client?.subId);
+  // Show the subscription section when ANY format is enabled — JSON is on by
+  // default and must appear even if the base64 sub is turned off. Each link
+  // below is still gated by its own format (base64 via subURI, JSON via
+  // subJsonEnable, Clash via subClashEnable).
+  const showSubscription = !!(
+    (subSettings?.enable || subSettings?.subJsonEnable || subSettings?.subClashEnable) &&
+    client?.subId
+  );
 
   async function copyValue(text: string) {
     if (!text) return;

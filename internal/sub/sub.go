@@ -250,7 +250,19 @@ func (s *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
-	if !subEnable {
+	// The subscription server hosts every format (base64 links, JSON, Clash).
+	// Each format is an independent toggle, so the server must come up when ANY
+	// of them is on — otherwise turning off the base64 sub would also kill the
+	// JSON subscription, which is enabled by default.
+	subJsonEnable, err := s.settingService.GetSubJsonEnable()
+	if err != nil {
+		return err
+	}
+	subClashEnable, err := s.settingService.GetSubClashEnable()
+	if err != nil {
+		return err
+	}
+	if !subEnable && !subJsonEnable && !subClashEnable {
 		return nil
 	}
 

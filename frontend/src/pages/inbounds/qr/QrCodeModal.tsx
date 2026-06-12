@@ -100,7 +100,7 @@ export default function QrCodeModal({
     const subId = client?.subId;
     let nextSub = '';
     let nextSubJson = '';
-    if (subSettings?.enable && subId) {
+    if ((subSettings?.enable || subSettings?.subJsonEnable) && subId) {
       nextSub = (subSettings.subURI || '') + subId;
       nextSubJson = subSettings.subJsonEnable ? (subSettings.subJsonURI || '') + subId : '';
     }

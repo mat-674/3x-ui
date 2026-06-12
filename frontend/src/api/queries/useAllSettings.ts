@@ -50,7 +50,14 @@ export function useAllSettings() {
       return HttpUtil.post('/panel/api/setting/update', body.success ? body.data : next);
     },
     onSuccess: (msg) => {
-      if (msg?.success) queryClient.invalidateQueries({ queryKey: keys.settings.all() });
+      if (msg?.success) {
+        queryClient.invalidateQueries({ queryKey: keys.settings.all() });
+        // defaultSettings feeds subSettings (sub path, subJson/clash enable +
+        // URIs) on the Clients and Inbounds pages. Both cache it with
+        // staleTime: Infinity, so without this they keep showing the old
+        // subscription path / hide the JSON link until a full reload.
+        queryClient.invalidateQueries({ queryKey: keys.settings.defaults() });
+      }
     },
   });
 
