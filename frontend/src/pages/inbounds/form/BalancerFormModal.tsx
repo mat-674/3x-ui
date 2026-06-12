@@ -1,18 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Collapse, Form, Input, Modal, Radio, Select, message } from 'antd';
+import { Alert, Collapse, Form, Input, Modal, Select, message } from 'antd';
 
 import { HttpUtil } from '@/utils';
 import { formatInboundLabel } from '@/lib/inbounds/label';
 import { coerceInboundJsonField, type DBInbound } from '@/models/dbinbound';
 import { Protocols } from '@/schemas/primitives';
-
-type Visibility = 'all' | 'selected';
-
-interface MemberSub {
-  subId: string;
-  emails: string[];
-}
 
 interface BalancerFormModalProps {
   open: boolean;
@@ -40,8 +33,6 @@ interface BalancerSettings {
   members?: number[];
   probeUrl?: string;
   probeInterval?: string;
-  visibility?: Visibility;
-  subIds?: string[];
 }
 
 export default function BalancerFormModal({
@@ -58,10 +49,6 @@ export default function BalancerFormModal({
   const [memberIds, setMemberIds] = useState<number[]>([]);
   const [probeUrl, setProbeUrl] = useState(DEFAULT_PROBE_URL);
   const [probeInterval, setProbeInterval] = useState(DEFAULT_PROBE_INTERVAL);
-  const [visibility, setVisibility] = useState<Visibility>('all');
-  const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
-  const [memberSubs, setMemberSubs] = useState<MemberSub[]>([]);
-  const [loadingSubs, setLoadingSubs] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -73,44 +60,13 @@ export default function BalancerFormModal({
       setMemberIds(Array.isArray(balancer.members) ? balancer.members : []);
       setProbeUrl(balancer.probeUrl || DEFAULT_PROBE_URL);
       setProbeInterval(balancer.probeInterval || DEFAULT_PROBE_INTERVAL);
-      setVisibility(balancer.visibility === 'selected' ? 'selected' : 'all');
-      setSelectedSubIds(Array.isArray(balancer.subIds) ? balancer.subIds : []);
     } else {
       setRemark('');
       setMemberIds([]);
       setProbeUrl(DEFAULT_PROBE_URL);
       setProbeInterval(DEFAULT_PROBE_INTERVAL);
-      setVisibility('all');
-      setSelectedSubIds([]);
     }
-    setMemberSubs([]);
   }, [open, mode, dbInbound]);
-
-  // Load candidate subscription IDs from the selected members whenever the
-  // visibility picker needs them. Members drive the list, so refetch on change.
-  useEffect(() => {
-    if (!open || visibility !== 'selected' || memberIds.length === 0) {
-      if (visibility !== 'selected') setMemberSubs([]);
-      return;
-    }
-    let cancelled = false;
-    setLoadingSubs(true);
-    HttpUtil.post('/panel/api/inbounds/balancer/memberSubs', { memberIds }, {
-      headers: { 'Content-Type': 'application/json' },
-      silent: true,
-    })
-      .then((msg) => {
-        if (cancelled) return;
-        const rows = Array.isArray(msg?.obj) ? (msg.obj as MemberSub[]) : [];
-        setMemberSubs(rows);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingSubs(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, visibility, memberIds]);
 
   const memberOptions = useMemo(
     () =>
@@ -119,19 +75,6 @@ export default function BalancerFormModal({
         .map((ib) => ({ value: ib.id, label: formatInboundLabel(ib.tag, ib.remark) })),
     [dbInbounds],
   );
-
-  // SubId options: candidates loaded from members, plus any already-selected
-  // subIds not in that list (e.g. a member was removed after selection) so the
-  // admin can still see and clear them. The label shows the client emails that
-  // share the subId for readability.
-  const subOptions = useMemo(() => {
-    const ids = new Set(memberSubs.map((s) => s.subId));
-    for (const id of selectedSubIds) ids.add(id);
-    return Array.from(ids).map((subId) => {
-      const emails = memberSubs.find((s) => s.subId === subId)?.emails ?? [];
-      return { value: subId, label: emails.length > 0 ? `${subId} — ${emails.join(', ')}` : subId };
-    });
-  }, [memberSubs, selectedSubIds]);
 
   const submit = async () => {
     if (memberIds.length < 2) {
@@ -150,8 +93,6 @@ export default function BalancerFormModal({
             members: memberIds,
             probeUrl: probeUrl || DEFAULT_PROBE_URL,
             probeInterval: probeInterval || DEFAULT_PROBE_INTERVAL,
-            visibility,
-            subIds: visibility === 'selected' ? selectedSubIds : [],
           },
         }),
         streamSettings: '',
@@ -209,36 +150,6 @@ export default function BalancerFormModal({
             optionFilterProp="label"
           />
         </Form.Item>
-        <Form.Item label={t('pages.inbounds.balancer.visibility')}>
-          <Radio.Group
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as Visibility)}
-            optionType="button"
-            buttonStyle="solid"
-            options={[
-              { value: 'all', label: t('pages.inbounds.balancer.visibilityAll') },
-              { value: 'selected', label: t('pages.inbounds.balancer.visibilitySelected') },
-            ]}
-          />
-        </Form.Item>
-        {visibility === 'selected' && (
-          <Form.Item
-            label={t('pages.inbounds.balancer.shownTo')}
-            help={memberIds.length === 0 ? t('pages.inbounds.balancer.selectMembersFirst') : undefined}
-          >
-            <Select
-              mode="multiple"
-              style={{ width: '100%' }}
-              value={selectedSubIds}
-              onChange={setSelectedSubIds}
-              options={subOptions}
-              loading={loadingSubs}
-              placeholder={t('pages.inbounds.balancer.selectSubs')}
-              optionFilterProp="label"
-              disabled={memberIds.length === 0}
-            />
-          </Form.Item>
-        )}
         <Collapse
           ghost
           items={[

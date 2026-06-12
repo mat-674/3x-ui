@@ -668,6 +668,12 @@ func (s *InboundService) DelInbound(id int) (bool, error) {
 		return false, err
 	}
 
+	// Deleting a balancer drops the member-server provisioning of any clients
+	// that were assigned to it, so rebuild the config to remove those users.
+	if ib.Protocol == model.Balancer {
+		needRestart = true
+	}
+
 	if err := db.Delete(model.Inbound{}, id).Error; err != nil {
 		return needRestart, err
 	}

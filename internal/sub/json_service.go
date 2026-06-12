@@ -62,9 +62,12 @@ func (s *SubJsonService) GetJson(subId string, host string) (string, string, err
 	// resolveInboundAddress call inside picks node-aware host values.
 	s.SubService.PrepareForRequest(host)
 	inbounds, err := s.SubService.getInboundsBySubId(subId)
-	if err != nil || len(inbounds) == 0 {
+	if err != nil {
 		return "", "", err
 	}
+	// Note: an empty inbounds list is not a short-circuit — a client assigned
+	// only to a balancer has no regular inbounds yet still gets the balanced
+	// config below. The final len(configArray) check handles "truly empty".
 
 	var header string
 	var configArray []json_util.RawMessage
@@ -224,21 +227,23 @@ func (s *SubJsonService) getConfig(inbound *model.Inbound, client model.Client, 
 }
 
 // getBalancerConfig emits one JSON config that load-balances across the
-// balancer's member inbounds. Each member (where the subId's client exists)
-// contributes one or more proxy-N outbounds; an xray balancer with the
-// leastPing strategy plus an observatory selects between them on the client.
-// Returns false when fewer than two outbounds materialize — a balancer needs at
-// least two endpoints to balance, otherwise the member already appears on its
-// own alongside.
+// balancer's member inbounds for a client assigned to the balancer. Visibility
+// is driven purely by client assignment: the balancer is shown only when this
+// subId owns a client on the balancer itself. Each member contributes one or
+// more proxy-N outbounds built from that client's credentials; an xray balancer
+// with the leastPing strategy plus an observatory selects between them on the
+// client. Returns false when fewer than two outbounds materialize.
 func (s *SubJsonService) getBalancerConfig(balancer *model.Inbound, members []*model.Inbound, subId string, host string) (json_util.RawMessage, bool) {
 	settings, err := model.ParseBalancerSettings(balancer.Settings)
 	if err != nil {
 		return nil, false
 	}
 
-	// A "selected" balancer is gated to its allow-listed subscription IDs
-	// before any outbound is built.
-	if !settings.VisibleTo(subId) {
+	// The clients assigned to the balancer (same attach flow as any inbound)
+	// are the sole visibility gate — no client for this subId means the
+	// balancer is not part of this subscription.
+	clients := s.SubService.matchingClients(balancer, subId)
+	if len(clients) == 0 {
 		return nil, false
 	}
 
@@ -249,13 +254,12 @@ func (s *SubJsonService) getBalancerConfig(balancer *model.Inbound, members []*m
 		if member == nil || !member.Enable || member.Protocol == model.Balancer {
 			continue
 		}
-		clients := s.SubService.matchingClients(member, subId)
-		if len(clients) == 0 {
-			continue
-		}
 		s.SubService.projectThroughFallbackMaster(member)
 		for _, client := range clients {
-			for _, variant := range s.buildOutboundVariants(member, client, host) {
+			// Copy the member per client so buildOutboundVariants' in-place
+			// Listen/Port mutation doesn't bleed across iterations.
+			m := *member
+			for _, variant := range s.buildOutboundVariants(&m, client, host) {
 				idx++
 				tag := fmt.Sprintf("proxy-%d", idx)
 				outbounds = append(outbounds, retagOutbound(variant.raw, tag))

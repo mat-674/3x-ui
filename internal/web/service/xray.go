@@ -148,6 +148,26 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 			return nil, listErr
 		}
 
+		// Fold in clients assigned only to a balancer that includes this
+		// inbound: they have no client_inbounds row here, but the member server
+		// must still accept them so the balanced subscription works. Dedup by
+		// email so a client both directly attached and balancer-assigned isn't
+		// provisioned twice.
+		if balancerClients := s.inboundService.BalancerClientsForMember(inbound.Id); len(balancerClients) > 0 {
+			seen := make(map[string]struct{}, len(dbClients))
+			for i := range dbClients {
+				seen[strings.ToLower(dbClients[i].Email)] = struct{}{}
+			}
+			for i := range balancerClients {
+				key := strings.ToLower(balancerClients[i].Email)
+				if _, dup := seen[key]; dup {
+					continue
+				}
+				seen[key] = struct{}{}
+				dbClients = append(dbClients, balancerClients[i])
+			}
+		}
+
 		clientStats := inbound.ClientStats
 		enableMap := make(map[string]bool, len(clientStats))
 		for _, clientTraffic := range clientStats {

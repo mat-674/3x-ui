@@ -132,12 +132,15 @@ func TestSubJsonServiceBalancerConfig(t *testing.T) {
 	sub := NewSubService(false, "-io")
 	svc := NewSubJsonService("", "", "", sub)
 
+	// The balancer carries the assigned client (subId "sub1"); members only
+	// supply the endpoint + protocol. Outbound credentials come from the
+	// balancer client.
 	balancer := &model.Inbound{
 		Id:       10,
 		Protocol: model.Balancer,
 		Remark:   "EU-LB",
 		Enable:   true,
-		Settings: (&model.BalancerSettings{Members: []int{1, 2}}).JSON(),
+		Settings: `{"balancer":{"members":[1,2]},"clients":[{"id":"uuid-1","email":"alice","subId":"sub1"}]}`,
 	}
 	mkMember := func(id int, proto model.Protocol) *model.Inbound {
 		return &model.Inbound{
@@ -147,7 +150,7 @@ func TestSubJsonServiceBalancerConfig(t *testing.T) {
 			Listen:         "1.2.3.4",
 			Port:           443,
 			StreamSettings: `{"network":"tcp","security":"none","tcpSettings":{"header":{"type":"none"}}}`,
-			Settings:       `{"encryption":"none","clients":[{"id":"uuid-` + string(rune('0'+id)) + `","email":"e` + string(rune('0'+id)) + `","subId":"sub1"}]}`,
+			Settings:       `{"encryption":"none"}`,
 		}
 	}
 	members := []*model.Inbound{mkMember(1, model.VLESS), mkMember(2, model.VMESS)}
@@ -216,31 +219,27 @@ func TestSubJsonServiceBalancerConfig(t *testing.T) {
 	}
 }
 
-func TestSubJsonServiceBalancerVisibilitySelected(t *testing.T) {
+func TestSubJsonServiceBalancerVisibilityByAssignment(t *testing.T) {
 	sub := NewSubService(false, "-io")
 	svc := NewSubJsonService("", "", "", sub)
 
-	mkMember := func(id int, proto model.Protocol, email string) *model.Inbound {
+	mkMember := func(id int, proto model.Protocol) *model.Inbound {
 		return &model.Inbound{
 			Id: id, Protocol: proto, Enable: true, Listen: "1.2.3.4", Port: 443,
 			StreamSettings: `{"network":"tcp","security":"none","tcpSettings":{"header":{"type":"none"}}}`,
-			Settings:       `{"encryption":"none","clients":[{"id":"uuid-` + email + `","email":"` + email + `","subId":"sub1"}]}`,
+			Settings:       `{"encryption":"none"}`,
 		}
 	}
-	members := []*model.Inbound{mkMember(1, model.VLESS, "alice"), mkMember(2, model.VMESS, "alice")}
+	members := []*model.Inbound{mkMember(1, model.VLESS), mkMember(2, model.VMESS)}
 
-	// Selected, allow-list = [sub2] → sub1 must NOT see it.
-	hidden := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true,
-		Settings: (&model.BalancerSettings{Members: []int{1, 2}, Visibility: model.BalancerVisibilitySelected, SubIds: []string{"sub2"}}).JSON()}
-	if _, ok := svc.getBalancerConfig(hidden, members, "sub1", "h"); ok {
-		t.Fatal("selected balancer must be hidden from a subId not in its allow-list")
+	// Balancer assigned to subId "sub1" only → "sub2" must NOT see it.
+	balancer := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true,
+		Settings: `{"balancer":{"members":[1,2]},"clients":[{"id":"uuid-1","email":"alice","subId":"sub1"}]}`}
+	if _, ok := svc.getBalancerConfig(balancer, members, "sub2", "h"); ok {
+		t.Fatal("balancer must be hidden from a subId not assigned to it")
 	}
-
-	// Selected, allow-list = [sub1] → sub1 sees it.
-	shown := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true,
-		Settings: (&model.BalancerSettings{Members: []int{1, 2}, Visibility: model.BalancerVisibilitySelected, SubIds: []string{"sub1"}}).JSON()}
-	if _, ok := svc.getBalancerConfig(shown, members, "sub1", "h"); !ok {
-		t.Fatal("selected balancer must be visible to an allow-listed subId")
+	if _, ok := svc.getBalancerConfig(balancer, members, "sub1", "h"); !ok {
+		t.Fatal("balancer must be visible to the subId assigned to it")
 	}
 }
 
@@ -248,11 +247,12 @@ func TestSubJsonServiceBalancerNeedsTwoEndpoints(t *testing.T) {
 	sub := NewSubService(false, "-io")
 	svc := NewSubJsonService("", "", "", sub)
 
-	balancer := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true, Settings: (&model.BalancerSettings{Members: []int{1}}).JSON()}
+	balancer := &model.Inbound{Id: 10, Protocol: model.Balancer, Enable: true,
+		Settings: `{"balancer":{"members":[1]},"clients":[{"id":"uuid-1","email":"alice","subId":"sub1"}]}`}
 	member := &model.Inbound{
 		Id: 1, Protocol: model.VLESS, Enable: true, Listen: "1.2.3.4", Port: 443,
 		StreamSettings: `{"network":"tcp","security":"none","tcpSettings":{"header":{"type":"none"}}}`,
-		Settings:       `{"encryption":"none","clients":[{"id":"uuid-1","email":"e1","subId":"sub1"}]}`,
+		Settings:       `{"encryption":"none"}`,
 	}
 	if _, ok := svc.getBalancerConfig(balancer, []*model.Inbound{member}, "sub1", "h"); ok {
 		t.Fatal("a single endpoint must not yield a balancer config")

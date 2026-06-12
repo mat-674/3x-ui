@@ -71,7 +71,6 @@ func (a *InboundController) initRouter(g *gin.RouterGroup) {
 	g.POST("/add", a.addInbound)
 	g.POST("/balancer/add", a.addBalancer)
 	g.POST("/balancer/update/:id", a.updateBalancer)
-	g.POST("/balancer/memberSubs", a.balancerMemberSubs)
 	g.POST("/del/:id", a.delInbound)
 	g.POST("/bulkDel", a.bulkDelInbounds)
 	g.POST("/update/:id", a.updateInbound)
@@ -184,25 +183,6 @@ func (a *InboundController) addBalancer(c *gin.Context) {
 	a.broadcastInboundsUpdate(user.Id)
 }
 
-// balancerMemberSubs returns the candidate subscription IDs present on the
-// posted member inbounds, for the balancer's "selected" visibility picker.
-func (a *InboundController) balancerMemberSubs(c *gin.Context) {
-	var req struct {
-		MemberIds []int `json:"memberIds"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
-		return
-	}
-	user := session.GetLoginUser(c)
-	subs, err := a.inboundService.BalancerMemberSubs(user.Id, req.MemberIds)
-	if err != nil {
-		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
-		return
-	}
-	jsonObj(c, subs, nil)
-}
-
 // updateBalancer rewrites an existing balancer's members/probe/remark.
 func (a *InboundController) updateBalancer(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -222,6 +202,9 @@ func (a *InboundController) updateBalancer(c *gin.Context) {
 		return
 	}
 	jsonMsgObj(c, I18nWeb(c, "pages.inbounds.toasts.inboundUpdateSuccess"), inbound, nil)
+	// Member changes re-provision assigned clients onto different servers, so
+	// rebuild the running config.
+	a.xrayService.SetToNeedRestart()
 	a.broadcastInboundsUpdate(user.Id)
 }
 

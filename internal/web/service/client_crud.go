@@ -141,6 +141,19 @@ func (s *ClientService) fillProtocolDefaults(c *model.Client, ib *model.Inbound)
 		if c.Auth == "" {
 			c.Auth = strings.ReplaceAll(uuid.NewString(), "-", "")
 		}
+	case model.Balancer:
+		// A client assigned to a balancer is provisioned onto member inbounds of
+		// any protocol, so give it every credential type up front (uuid for
+		// vmess/vless, password for trojan/shadowsocks, auth for hysteria).
+		if c.ID == "" {
+			c.ID = uuid.NewString()
+		}
+		if c.Password == "" {
+			c.Password = strings.ReplaceAll(uuid.NewString(), "-", "")
+		}
+		if c.Auth == "" {
+			c.Auth = strings.ReplaceAll(uuid.NewString(), "-", "")
+		}
 	}
 	return nil
 }

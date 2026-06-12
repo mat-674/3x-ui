@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
@@ -53,7 +54,11 @@ func (s *InboundService) validateBalancerMembers(userId int, members []int) erro
 // prepareBalancer normalizes a balancer inbound before persisting: forces the
 // pseudo-protocol, validates members, re-serializes settings, and clears fields
 // that only apply to real xray inbounds (it never runs on xray-core).
-func (s *InboundService) prepareBalancer(inbound *model.Inbound) error {
+//
+// keepSettings carries the row's current settings JSON on update so the
+// attached-client list ("clients") written by the standard client-attach flow
+// survives an edit of the balancer's members/probe.
+func (s *InboundService) prepareBalancer(inbound *model.Inbound, keepSettings string) error {
 	settings, err := model.ParseBalancerSettings(inbound.Settings)
 	if err != nil {
 		return common.NewError("invalid balancer settings:", err)
@@ -61,8 +66,27 @@ func (s *InboundService) prepareBalancer(inbound *model.Inbound) error {
 	if err := s.validateBalancerMembers(inbound.UserId, settings.Members); err != nil {
 		return err
 	}
+	// Merge the balancer config into the existing settings object so the
+	// "clients" array (assigned clients) is preserved.
+	merged := map[string]any{}
+	if keepSettings != "" {
+		_ = json.Unmarshal([]byte(keepSettings), &merged)
+	}
+	var balancerObj map[string]any
+	_ = json.Unmarshal([]byte(settings.JSON()), &balancerObj)
+	merged["balancer"] = balancerObj["balancer"]
+	// Always keep a clients array so the standard client-attach flow (which
+	// does oldSettings["clients"].([]any)) doesn't trip over a fresh balancer.
+	if _, ok := merged["clients"].([]any); !ok {
+		merged["clients"] = []any{}
+	}
+	out, err := json.MarshalIndent(merged, "", "  ")
+	if err != nil {
+		return err
+	}
+
 	inbound.Protocol = model.Balancer
-	inbound.Settings = settings.JSON()
+	inbound.Settings = string(out)
 	inbound.StreamSettings = ""
 	inbound.Sniffing = ""
 	inbound.Listen = ""
@@ -76,7 +100,7 @@ func (s *InboundService) prepareBalancer(inbound *model.Inbound) error {
 // conflict checks, client handling, and the xray runtime push — a balancer is a
 // panel-only grouping that lives purely in the subscription layer.
 func (s *InboundService) AddBalancer(inbound *model.Inbound) (*model.Inbound, error) {
-	if err := s.prepareBalancer(inbound); err != nil {
+	if err := s.prepareBalancer(inbound, ""); err != nil {
 		return inbound, err
 	}
 	inbound.SubSortIndex = normalizeSubSortIndex(inbound.SubSortIndex)
@@ -105,7 +129,7 @@ func (s *InboundService) UpdateBalancer(inbound *model.Inbound) (*model.Inbound,
 		return inbound, common.NewError("inbound is not a balancer:", inbound.Id)
 	}
 	inbound.UserId = existing.UserId
-	if err := s.prepareBalancer(inbound); err != nil {
+	if err := s.prepareBalancer(inbound, existing.Settings); err != nil {
 		return inbound, err
 	}
 	inbound.Tag = existing.Tag
@@ -122,65 +146,32 @@ func (s *InboundService) UpdateBalancer(inbound *model.Inbound) (*model.Inbound,
 	return inbound, nil
 }
 
-// BalancerMemberClient is one candidate client the balancer can be shown to,
-// surfaced to the frontend's "selected" visibility picker. One entry per
-// distinct subscription ID, with the member-client emails that share it for a
-// human-readable label.
-type BalancerMemberSub struct {
-	SubID  string   `json:"subId"`
-	Emails []string `json:"emails"`
-}
-
-// BalancerMemberSubs returns the distinct subscription IDs present on the given
-// member inbounds, so the admin can pick which subscriptions see the balancer.
-// Only balancer-eligible member inbounds owned by the user are considered.
-// Clients without a subId are skipped — they can't be targeted by subscription.
-func (s *InboundService) BalancerMemberSubs(userId int, memberIds []int) ([]BalancerMemberSub, error) {
-	if len(memberIds) == 0 {
-		return nil, nil
-	}
+// BalancerClientsForMember returns the clients assigned to any enabled balancer
+// whose members include memberId. The Xray config builder folds these into the
+// member inbound's runtime user list so the member server accepts clients that
+// are attached only to the balancer (and therefore never get their own
+// client_inbounds row on the member).
+func (s *InboundService) BalancerClientsForMember(memberId int) []model.Client {
 	db := database.GetDB()
-	var rows []model.Inbound
-	if err := db.Model(model.Inbound{}).Where("id IN ? AND user_id = ?", memberIds, userId).Find(&rows).Error; err != nil {
-		return nil, err
+	var balancers []*model.Inbound
+	if err := db.Model(model.Inbound{}).
+		Where("protocol = ? AND enable = ?", model.Balancer, true).
+		Find(&balancers).Error; err != nil {
+		return nil
 	}
-	bySub := make(map[string][]string)
-	order := make([]string, 0)
-	seenEmail := make(map[string]struct{})
-	for i := range rows {
-		ib := &rows[i]
-		if !balancerEligibleProtocols[ib.Protocol] {
+	var out []model.Client
+	for _, b := range balancers {
+		bs, err := model.ParseBalancerSettings(b.Settings)
+		if err != nil || !bs.Contains(memberId) {
 			continue
 		}
-		clients, err := s.GetClients(ib)
+		clients, err := s.clientService.ListForInbound(nil, b.Id)
 		if err != nil {
 			continue
 		}
-		for _, c := range clients {
-			if c.SubID == "" {
-				continue
-			}
-			if _, ok := bySub[c.SubID]; !ok {
-				order = append(order, c.SubID)
-			}
-			// Dedup emails within a subId so a client attached to several
-			// member inbounds isn't listed more than once in the label.
-			key := c.SubID + "\x00" + c.Email
-			if c.Email != "" {
-				if _, dup := seenEmail[key]; !dup {
-					seenEmail[key] = struct{}{}
-					bySub[c.SubID] = append(bySub[c.SubID], c.Email)
-				}
-			} else if _, ok := bySub[c.SubID]; !ok {
-				bySub[c.SubID] = nil
-			}
-		}
+		out = append(out, clients...)
 	}
-	out := make([]BalancerMemberSub, 0, len(order))
-	for _, subId := range order {
-		out = append(out, BalancerMemberSub{SubID: subId, Emails: bySub[subId]})
-	}
-	return out, nil
+	return out
 }
 
 // generateBalancerTag picks a unique tag of the form "balancer-N" for a new

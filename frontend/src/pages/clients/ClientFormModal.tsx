@@ -32,6 +32,10 @@ const VMESS_SECURITY_OPTIONS = ['auto', 'aes-128-gcm', 'chacha20-poly1305', 'non
 
 const MULTI_CLIENT_PROTOCOLS = new Set([
   'shadowsocks', 'vless', 'vmess', 'trojan', 'hysteria',
+  // A balancer is assignable like any inbound: attaching a client to it puts
+  // the balanced (leastPing) profile in their JSON subscription, and the panel
+  // provisions them onto the balancer's member servers for credentials.
+  'balancer',
 ]);
 
 const CLIENT_FORM_MODAL_Z_INDEX = 1000;

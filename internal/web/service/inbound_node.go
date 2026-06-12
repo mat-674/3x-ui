@@ -30,6 +30,13 @@ func (s *InboundService) runtimeFor(ib *model.Inbound) (runtime.Runtime, error) 
 }
 
 func (s *InboundService) nodePushPlan(ib *model.Inbound) (runtime.Runtime, bool, bool, error) {
+	// A balancer never runs on xray-core, so there is nothing to push to. The
+	// client-apply paths treat "no push, local inbound" as "mark needRestart",
+	// which is exactly what we want: the member inbounds pick up the assigned
+	// client on the next config rebuild.
+	if ib.Protocol == model.Balancer {
+		return nil, false, false, nil
+	}
 	if ib.NodeID == nil {
 		rt, err := s.runtimeFor(ib)
 		if err != nil {
