@@ -6,6 +6,7 @@ import {
   canEnableReality,
   canEnableTlsFlow,
   canEnableStream,
+  canEnableSniffing,
   canEnableVisionSeed,
   isSS2022,
   isSSMultiUser,
@@ -48,6 +49,13 @@ function fixtureName(path: string): string {
 }
 
 describe('protocol capability predicates', () => {
+  it('keeps Naive on TLS without enabling Xray transport or sniffing', () => {
+    const values = { protocol: 'naive', streamSettings: { network: 'tcp', security: 'tls' } };
+    expect(canEnableTls(values)).toBe(true);
+    expect(canEnableStream(values)).toBe(false);
+    expect(canEnableSniffing(values)).toBe(false);
+  });
+
   const entries = Object.entries(fixtures).sort(([a], [b]) => a.localeCompare(b));
   for (const [path, raw] of entries) {
     const name = fixtureName(path);

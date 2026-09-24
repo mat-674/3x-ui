@@ -31,8 +31,8 @@ import (
 // section. A fixture xray-core refuses is a config the panel would let an
 // admin save and then fail to start the core with, taking every inbound down.
 //
-// mtproto is excluded: it is served by the bundled mtg-multi sidecar, not by
-// xray, so xray-core has no config id for it.
+// mtproto and naive are excluded: they are served by managed sidecars, not by
+// xray, so xray-core has no config id for them.
 
 func goldenFixtureDir(t *testing.T, category string) string {
 	t.Helper()
@@ -180,7 +180,7 @@ func buildGoldenInbound(t *testing.T, inbound map[string]any) error {
 // inbound and builds it.
 func TestGoldenInboundFixturesBuildInXray(t *testing.T) {
 	for name, fixture := range goldenFixtures(t, "inbound") {
-		if protocol, _ := fixture["protocol"].(string); protocol == string(model.MTProto) {
+		if protocol, _ := fixture["protocol"].(string); protocol == string(model.MTProto) || protocol == string(model.Naive) {
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
@@ -202,7 +202,7 @@ func TestGoldenInboundFixturesBuildInXray(t *testing.T) {
 func TestGoldenInboundFullFixturesBuildInXray(t *testing.T) {
 	for name, fixture := range goldenFixtures(t, "inbound-full") {
 		protocol, _ := fixture["protocol"].(string)
-		if protocol == string(model.MTProto) {
+		if protocol == string(model.MTProto) || protocol == string(model.Naive) {
 			continue
 		}
 		t.Run(name, func(t *testing.T) {

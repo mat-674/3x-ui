@@ -661,6 +661,20 @@ func (s *SubJsonService) getConfig(subReq *SubService, inbound *model.Inbound, c
 			newOutbounds = append(newOutbounds, wgOutbound)
 		case "amneziawg", "tuic":
 			continue
+		case model.Naive:
+			proxyURL := naiveClientProxyURL(client.Email, client.Password, inbound.Listen, inbound.Port, naiveLinkOptionsFromEndpoint(extPrxy))
+			if proxyURL == "" {
+				continue
+			}
+			config, err := json.MarshalIndent(map[string]string{
+				"listen": "socks://127.0.0.1:1080",
+				"proxy":  proxyURL,
+			}, "", "  ")
+			if err != nil {
+				continue
+			}
+			newJsonArray = append(newJsonArray, json_util.RawMessage(config))
+			continue
 		}
 
 		newOutbounds = append(newOutbounds, s.defaultOutbounds...)

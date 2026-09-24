@@ -107,8 +107,17 @@ export type InboundFormBase = z.infer<typeof InboundFormBaseSchema>;
 
 // Full form values = base + db fields + protocol-discriminated settings.
 // Consumers narrow on `.protocol` to access the matching settings branch.
-export const InboundFormSchema =
-  InboundFormBaseSchema.and(InboundDbFieldsSchema).and(InboundSettingsSchema);
+export const InboundFormSchema = InboundFormBaseSchema.and(InboundDbFieldsSchema)
+  .and(InboundSettingsSchema)
+  .superRefine((values, ctx) => {
+    if (values.protocol === 'naive' && values.streamSettings?.security !== 'tls') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['streamSettings', 'security'],
+        message: 'pages.inbounds.naive.tlsRequired',
+      });
+    }
+  });
 export type InboundFormValues = z.infer<typeof InboundFormSchema>;
 
 export const FallbackRowSchema = z.object({

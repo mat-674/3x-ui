@@ -5,6 +5,7 @@ import type { AmneziawgInboundSettings } from '@/schemas/protocols/inbound/amnez
 import type { HttpInboundSettings } from '@/schemas/protocols/inbound/http';
 import type { HysteriaClient, HysteriaInboundSettings } from '@/schemas/protocols/inbound/hysteria';
 import type { MixedInboundSettings } from '@/schemas/protocols/inbound/mixed';
+import type { NaiveInboundSettings } from '@/schemas/protocols/inbound/naive';
 import type { MtprotoClient, MtprotoInboundSettings } from '@/schemas/protocols/inbound/mtproto';
 import type {
   ShadowsocksClient,
@@ -338,6 +339,29 @@ export function createDefaultAmneziawgInboundSettings(): AmneziawgInboundSetting
   };
 }
 
+export interface NaiveClientSeed extends ClientBaseSeed {
+  password?: string;
+}
+
+export function createDefaultNaiveClient(seed: NaiveClientSeed = {}) {
+  return {
+    password: seed.password ?? RandomUtil.randomLowerAndNum(16),
+    ...clientBase(seed),
+  };
+}
+
+export function createDefaultNaiveInboundSettings(): NaiveInboundSettings {
+  return {
+    domain: '',
+    fallbackRoot: '',
+    probeResistance: true,
+    hideIp: true,
+    hideVia: true,
+    encode: true,
+    clients: [],
+  };
+}
+
 export function createDefaultTuicInboundSettings(): TuicInboundSettings {
   return {
     server: {
@@ -375,6 +399,7 @@ export type AnyInboundSettings =
   | WireguardInboundSettings
   | MtprotoInboundSettings
   | AmneziawgInboundSettings
+  | NaiveInboundSettings
   | TuicInboundSettings;
 
 export function createDefaultInboundSettings(protocol: string): AnyInboundSettings | null {
@@ -403,6 +428,8 @@ export function createDefaultInboundSettings(protocol: string): AnyInboundSettin
       return createDefaultMtprotoInboundSettings();
     case 'amneziawg':
       return createDefaultAmneziawgInboundSettings();
+    case 'naive':
+      return createDefaultNaiveInboundSettings();
     case 'tuic':
       return createDefaultTuicInboundSettings();
     default:

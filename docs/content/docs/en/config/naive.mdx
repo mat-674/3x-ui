@@ -1,0 +1,127 @@
+---
+title: NaiveProxy
+description: Set up a local NaiveProxy inbound with the bundled Caddy forwardproxy sidecar, TLS, clients, and native client configuration.
+icon: ShieldCheck
+---
+
+**NaiveProxy** is served by a Caddy process built with
+`forwardproxy@naive`. 3x-ui manages one Caddy sidecar for each enabled Naive
+inbound; the inbound is not added to the Xray configuration.
+
+<Callout type="info">
+  Naive inbounds are **panel-local**. They are reconciled on the main 3x-ui
+  instance and are not eligible for node deployment. The official Docker and
+  release packages include the matching Caddy binary. A source or custom
+  installation must provide a Caddy binary built with `forwardproxy@naive` in
+  the panel's `bin` directory or on `PATH`.
+</Callout>
+
+## Key settings
+
+| Field | Description |
+| --- | --- |
+| **Port** | TCP port owned by the Caddy sidecar. The port must not be shared with another listener. |
+| **Domain** | The public TLS hostname and probe-resistance hostname. Use a hostname covered by the certificate. |
+| **Certificate & Key** | The certificate and private key from the existing TLS editor. File paths and inline PEM values are supported. Both are required; ACME is not configured by this inbound. |
+| **Fallback root** | Optional directory served by Caddy when a request is not accepted as a valid proxy request. |
+| **Clients** | Each enabled client uses its **Email** as the Naive username and its **Password** as the Naive password. |
+| **External proxy endpoints** | Optional endpoint overrides can produce one link/config entry per endpoint. Their host, port, SNI (`sni`), and certificate-verification override (`allow_insecure`) metadata are preserved in exported configurations. |
+
+Naive uses the raw **TCP + TLS** security path. The inbound editor hides Xray
+transport, sniffing, and REALITY controls because they do not apply to this
+sidecar.
+
+## Set it up in the panel
+
+<Steps>
+
+<Step>
+### Add the inbound
+
+Open **Inbounds -> Add**, choose **NaiveProxy**, and assign an unused TCP port.
+Set a public domain that resolves to this server.
+</Step>
+
+<Step>
+### Configure TLS
+
+In the security tab, select **TLS** and provide a matching certificate and
+private key. If the values are entered as PEM text, the panel writes protected
+per-inbound files for Caddy at runtime.
+</Step>
+
+<Step>
+### Add clients
+
+Create at least one client. The client's Email becomes its username and its
+required Password is used for Basic Authentication by `forwardproxy@naive`.
+Disabled and expired clients are left out of the generated Caddyfile.
+</Step>
+
+<Step>
+### Save and verify the sidecar
+
+After saving, the panel starts or reconciles Caddy automatically. A Caddy
+failure is reported in the panel logs; changing the port, TLS material, domain,
+or client credentials causes the sidecar configuration to be reconciled.
+</Step>
+
+<Step>
+### Export a client configuration
+
+Use the client information or QR modal to copy the `naive+https://` share link
+or download the native JSON configuration. Subscription endpoints expose the
+same Naive entries when the client has a matching Sub ID.
+</Step>
+
+</Steps>
+
+## Client formats
+
+### Share link
+
+Raw links use URL-encoded credentials and the configured domain or endpoint:
+
+```text
+naive+https://user%40example.com:password@example.com:443#naive-share
+```
+
+A configured external endpoint can append `?allow_insecure=1&sni=origin.example.com` before the fragment. These query parameters preserve the endpoint's TLS metadata in the raw link and native JSON export.
+
+### Native JSON
+
+The JSON export is the upstream Naive client shape, not an Xray outbound:
+
+```json title="naive.json"
+{
+  "listen": "socks://127.0.0.1:1080",
+  "proxy": "https://user%40example.com:password@example.com:443"
+}
+```
+
+The `listen` address is local to the client application. The `proxy` URL carries
+the Naive server credentials and HTTPS endpoint. Credentials must remain URL
+encoded when they contain reserved characters. When an external endpoint has
+TLS overrides, the same `allow_insecure=1` and `sni=...` query parameters are
+retained on this URL.
+
+### Clash / Mihomo
+
+Clash and Mihomo subscriptions represent Naive as a TLS-enabled HTTP CONNECT
+proxy with `username`, `password`, `servername`, and `skip-cert-verify` fields.
+This is an interoperability representation; it does not turn the server into
+an Xray HTTP inbound.
+
+## Lifecycle and limitations
+
+<Callout type="info">
+  - **One sidecar per inbound**: The panel writes an isolated Caddyfile and TLS material for each Naive inbound and stops obsolete sidecars during reconciliation.
+  - **Client filtering**: Disabled clients and clients whose expiry has passed are not written into Caddy's authentication rules.
+  - **No Xray client features**: Naive does not provide Xray per-client statistics, `limitIp`, per-client speed limits, or Xray outbound settings. Use the panel's enable and expiry controls for access lifecycle.
+  - **No nodes**: Naive is available on the local panel only. It is not copied to sub-nodes or managed through the node runtime.
+  - **Fallback behavior**: With a fallback root configured, Caddy serves ordinary requests through `file_server`; probe resistance uses the configured domain to make invalid proxy requests look like the fallback site.
+</Callout>
+
+If the sidecar does not start, check that the Caddy binary is present, the port
+is free, the domain is a valid hostname, and the certificate/key match and are
+readable by the 3x-ui process.

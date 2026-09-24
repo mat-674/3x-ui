@@ -22,6 +22,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/mtproto"
+	"github.com/mhsanaei/3x-ui/v3/internal/naive"
 	"github.com/mhsanaei/3x-ui/v3/internal/tuic"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/sys"
@@ -300,6 +301,7 @@ const (
 	cadenceMtproto       = "@every 10s"
 	cadenceAmneziaWG     = "@every 10s"
 	cadenceTuic          = "@every 10s"
+	cadenceNaive         = "@every 10s"
 	cadenceClientIPScan  = "@every 10s"
 	cadenceNodeHeartbeat = "@every 5s"
 	cadenceNodeTraffic   = "@every 5s"
@@ -349,6 +351,10 @@ func (s *Server) startTask(restartXray bool, loc *time.Location) {
 	tuicJob := job.NewTuicJob()
 	_, _ = s.cron.AddJob(cadenceTuic, tuicJob)
 	go tuicJob.Run()
+
+	naiveJob := job.NewNaiveJob()
+	_, _ = s.cron.AddJob(cadenceNaive, naiveJob)
+	go naiveJob.Run()
 
 	// check client ips from log file every 10 sec
 	_, _ = s.cron.AddJob(cadenceClientIPScan, job.NewCheckClientIpJob())
@@ -796,6 +802,7 @@ func (s *Server) stop(stopXray bool, stopTgBot bool) error {
 		mtproto.GetManager().StopAll()
 		amneziawgnet.GetManager().StopAll()
 		tuic.GetManager().StopAll()
+		naive.GetManager().StopAll()
 		amneziawgnet.GetOutboundManager().StopAll()
 	}
 	if s.cron != nil {

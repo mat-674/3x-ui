@@ -40,7 +40,10 @@ import { FormField, rhfZodValidate } from '@/components/form/rhf';
 import { Protocols, TRAFFIC_RESETS } from '@/schemas/primitives';
 import { SockoptStreamSettingsSchema } from '@/schemas/protocols/stream/sockopt';
 import { HysteriaStreamSettingsSchema } from '@/schemas/protocols/stream/hysteria';
-import { createHysteriaTlsSettingsWithDefaultCert } from '@/lib/xray/inbound-tls-defaults';
+import {
+  createHysteriaTlsSettingsWithDefaultCert,
+  createTlsSettingsWithDefaultCert,
+} from '@/lib/xray/inbound-tls-defaults';
 import { NODE_ELIGIBLE_PROTOCOLS } from '@/lib/xray/node-protocols';
 import { VLESS_AUTH_LABEL_KEYS, vlessEncryptionAuthKind } from '@/lib/xray/vless-encryption';
 import { SniffingSchema } from '@/schemas/primitives/sniffing';
@@ -64,6 +67,7 @@ import {
   MtprotoFields,
   ShadowsocksFields,
   TuicFields,
+  NaiveFields,
   TunFields,
   TunnelFields,
   VlessFields,
@@ -229,7 +233,9 @@ export default function InboundFormModal({
   const [messageApi, messageContextHolder] = message.useMessage();
   const [modal, modalContextHolder] = Modal.useModal();
   const methods = useForm<InboundFormValues>({ defaultValues: buildAddModeValues() });
+  // SAFETY: React Hook Form rejects dynamic protocol-specific paths at the type level.
   const setV = methods.setValue as unknown as (name: string, value: unknown) => void;
+  // SAFETY: Dynamic reads stay within this form; callers narrow returned values before use.
   const getV = methods.getValues as unknown as (name?: string) => unknown;
   const control = methods.control;
   const [saving, setSaving] = useState(false);
@@ -279,7 +285,8 @@ export default function InboundFormModal({
     protocol !== Protocols.HYSTERIA &&
     protocol !== Protocols.WIREGUARD &&
     protocol !== Protocols.TUNNEL &&
-    protocol !== Protocols.TUIC;
+    protocol !== Protocols.TUIC &&
+    protocol !== Protocols.NAIVE;
 
   const wPort = useWatch({ control, name: 'port' });
   const wListen = (useWatch({ control, name: 'listen' }) ?? '') as string;
@@ -332,6 +339,15 @@ export default function InboundFormModal({
     setScanResult,
     setScanning,
   });
+
+  useEffect(() => {
+    if (!open || protocol !== Protocols.NAIVE) return;
+    if (security !== 'tls') {
+      void onSecurityChange('tls');
+      return;
+    }
+    if (network !== 'tcp') setV('streamSettings.network', 'tcp');
+  }, [open, network, onSecurityChange, protocol, security, setV]);
 
   const toggleSockopt = (on: boolean) => {
     if (on) {
@@ -541,6 +557,13 @@ export default function InboundFormModal({
               },
             ],
           },
+        });
+      } else if (next === Protocols.NAIVE) {
+        setV('streamSettings', {
+          network: 'tcp',
+          security: 'tls',
+          tcpSettings: {},
+          tlsSettings: createTlsSettingsWithDefaultCert(),
         });
       } else if (next === Protocols.WIREGUARD || next === Protocols.TUNNEL) {
         setV('streamSettings', { security: 'none' });
@@ -801,6 +824,8 @@ export default function InboundFormModal({
 
       {protocol === Protocols.TUIC && <TuicFields />}
 
+      {protocol === Protocols.NAIVE && <NaiveFields />}
+
       {protocol === Protocols.TUN && <TunFields />}
 
       {protocol === Protocols.TUNNEL && <TunnelFields />}
@@ -952,7 +977,7 @@ export default function InboundFormModal({
 
   const tlsOk = canEnableTls({ protocol, streamSettings: { network, security } });
   const realityOk = canEnableReality({ protocol, streamSettings: { network, security } });
-  const tlsOnly = protocol === Protocols.HYSTERIA;
+  const tlsOnly = protocol === Protocols.HYSTERIA || protocol === Protocols.NAIVE;
 
   const securityTab = (
     <>
@@ -1140,6 +1165,7 @@ export default function InboundFormModal({
                     Protocols.MTPROTO,
                     Protocols.AMNEZIAWG,
                     Protocols.TUIC,
+                    Protocols.NAIVE,
                   ] as string[]
                 ).includes(protocol) || isFallbackHost
                   ? [
@@ -1170,7 +1196,16 @@ export default function InboundFormModal({
                           ]
                         : []),
                     ]
-                  : []),
+                  : protocol === Protocols.NAIVE
+                    ? [
+                        {
+                          key: 'security',
+                          label: t('pages.inbounds.securityTab'),
+                          children: securityTab,
+                          forceRender: true,
+                        },
+                      ]
+                    : []),
                 ...(sniffingSupported
                   ? [
                       {

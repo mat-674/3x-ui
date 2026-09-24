@@ -12,6 +12,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/mtproto"
+	"github.com/mhsanaei/3x-ui/v3/internal/naive"
 	"github.com/mhsanaei/3x-ui/v3/internal/tuic"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
@@ -55,6 +56,13 @@ func (l *Local) AddInbound(_ context.Context, ib *model.Inbound) error {
 			return nil
 		}
 		return mtproto.GetManager().Ensure(inst)
+	}
+	if ib.Protocol == model.Naive {
+		inst, ok := naive.InstanceFromInbound(ib)
+		if !ok {
+			return nil
+		}
+		return naive.GetManager().Ensure(inst)
 	}
 	if ib.Protocol == model.AmneziaWG {
 		inst, ok := amneziawg.InstanceFromInbound(ib)
@@ -106,6 +114,10 @@ func (l *Local) DelInbound(_ context.Context, ib *model.Inbound) error {
 		mtproto.GetManager().Remove(ib.Id)
 		return nil
 	}
+	if ib.Protocol == model.Naive {
+		naive.GetManager().Remove(ib.Id)
+		return nil
+	}
 	if ib.Protocol == model.AmneziaWG {
 		amneziawgnet.GetManager().Remove(ib.Id)
 		// The removed inbound may have been the only one backing Xray's
@@ -128,6 +140,9 @@ func (l *Local) DelInbound(_ context.Context, ib *model.Inbound) error {
 func (l *Local) UpdateInbound(ctx context.Context, oldIb, newIb *model.Inbound) error {
 	if oldIb.Protocol == model.MTProto || newIb.Protocol == model.MTProto {
 		return l.updateMtprotoInbound(ctx, oldIb, newIb)
+	}
+	if oldIb.Protocol == model.Naive || newIb.Protocol == model.Naive {
+		return l.updateNaiveInbound(ctx, oldIb, newIb)
 	}
 	if oldIb.Protocol == model.AmneziaWG || newIb.Protocol == model.AmneziaWG {
 		return l.updateAmneziaWGInbound(ctx, oldIb, newIb)
@@ -186,6 +201,31 @@ func (l *Local) updateMtprotoInbound(ctx context.Context, oldIb, newIb *model.In
 // all (its first peer added, or its last one removed) must still get that
 // relay created or torn down, so flag Xray for a resync unconditionally
 // here rather than trying to enumerate which of the branches below need it.
+// updateNaiveInbound preserves an unchanged Caddy process and removes it when
+// the inbound becomes disabled or has no usable clients.
+func (l *Local) updateNaiveInbound(ctx context.Context, oldIb, newIb *model.Inbound) error {
+	if oldIb.Protocol == model.Naive && newIb.Protocol != model.Naive {
+		naive.GetManager().Remove(oldIb.Id)
+		if !newIb.Enable {
+			return nil
+		}
+		return l.AddInbound(ctx, newIb)
+	}
+	if oldIb.Protocol != model.Naive {
+		_ = l.DelInbound(ctx, oldIb)
+	}
+	if !newIb.Enable {
+		naive.GetManager().Remove(newIb.Id)
+		return nil
+	}
+	inst, ok := naive.InstanceFromInbound(newIb)
+	if !ok {
+		naive.GetManager().Remove(newIb.Id)
+		return nil
+	}
+	return naive.GetManager().Ensure(inst)
+}
+
 func (l *Local) updateAmneziaWGInbound(ctx context.Context, oldIb, newIb *model.Inbound) error {
 	if l.deps.SetNeedRestart != nil {
 		l.deps.SetNeedRestart()
@@ -249,7 +289,7 @@ func (l *Local) updateTuicInbound(ctx context.Context, oldIb, newIb *model.Inbou
 }
 
 func (l *Local) AddUser(_ context.Context, ib *model.Inbound, userMap map[string]any) error {
-	if ib.Protocol == model.MTProto || ib.Protocol == model.AmneziaWG || ib.Protocol == model.TUIC {
+	if ib.Protocol == model.MTProto || ib.Protocol == model.AmneziaWG || ib.Protocol == model.TUIC || ib.Protocol == model.Naive {
 		return nil
 	}
 	return l.withAPI(func(api *xray.XrayAPI) error {
@@ -258,7 +298,7 @@ func (l *Local) AddUser(_ context.Context, ib *model.Inbound, userMap map[string
 }
 
 func (l *Local) RemoveUser(_ context.Context, ib *model.Inbound, email string) error {
-	if ib.Protocol == model.MTProto || ib.Protocol == model.AmneziaWG || ib.Protocol == model.TUIC {
+	if ib.Protocol == model.MTProto || ib.Protocol == model.AmneziaWG || ib.Protocol == model.TUIC || ib.Protocol == model.Naive {
 		return nil
 	}
 	return l.withAPI(func(api *xray.XrayAPI) error {

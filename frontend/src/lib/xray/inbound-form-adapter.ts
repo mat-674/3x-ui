@@ -8,6 +8,7 @@ import {
   AmneziawgClientSchema,
   HysteriaClientSchema,
   MtprotoClientSchema,
+  NaiveClientSchema,
   ShadowsocksClientSchema,
   TrojanClientSchema,
   TuicClientSchema,
@@ -232,12 +233,21 @@ export function rawInboundToFormValues(row: RawInboundRow): InboundFormValues {
 // arrays (vless clients, wireguard peers, etc.) which the Go side then
 // serialized back as `null`. Primitive values (including 0, false, '')
 // are kept verbatim.
-export function pruneEmpty(value: unknown): unknown {
+export type PrunedValue =
+  | undefined
+  | null
+  | boolean
+  | number
+  | string
+  | PrunedValue[]
+  | { [key: string]: PrunedValue };
+
+export function pruneEmpty(value: unknown): PrunedValue {
   if (Array.isArray(value)) {
     return value.map(pruneEmpty);
   }
   if (value !== null && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
+    const out: { [key: string]: PrunedValue } = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       const p = pruneEmpty(v);
       if (p === undefined) continue;
@@ -245,7 +255,10 @@ export function pruneEmpty(value: unknown): unknown {
     }
     return out;
   }
-  return value;
+  if (value === undefined || value === null || typeof value !== 'object') {
+    return value as Exclude<PrunedValue, PrunedValue[] | { [key: string]: PrunedValue }>;
+  }
+  return undefined;
 }
 
 // Per-protocol client field whitelist — the Zod schemas in
@@ -274,6 +287,8 @@ function clientSchemaForProtocol(protocol: string): z.ZodType | null {
       return MtprotoClientSchema;
     case 'amneziawg':
       return AmneziawgClientSchema;
+    case 'naive':
+      return NaiveClientSchema;
     case 'tuic':
       return TuicClientSchema;
     default:
@@ -281,12 +296,17 @@ function clientSchemaForProtocol(protocol: string): z.ZodType | null {
   }
 }
 
-export function normalizeClients(protocol: string, clients: unknown): unknown {
+export function normalizeClients(protocol: string, clients: unknown[]): Record<string, unknown>[] {
   const schema = clientSchemaForProtocol(protocol);
-  if (!schema || !Array.isArray(clients)) return clients;
-  return clients.map((c) => {
-    const parsed = schema.safeParse(c);
-    return parsed.success ? parsed.data : c;
+  return clients.map((client) => {
+    const parsed = schema?.safeParse(client);
+    if (parsed?.success && typeof parsed.data === 'object' && parsed.data !== null) {
+      return parsed.data as Record<string, unknown>;
+    }
+    if (typeof client === 'object' && client !== null && !Array.isArray(client)) {
+      return client as Record<string, unknown>;
+    }
+    return {};
   });
 }
 

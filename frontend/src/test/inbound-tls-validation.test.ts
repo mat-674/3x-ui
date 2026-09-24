@@ -133,6 +133,49 @@ describe('inbound TLS certificate validation', () => {
     ).toBe(true);
   });
 
+  it('requires Naive domain and TLS credentials on the inbound form', () => {
+    const inbound = {
+      port: 443,
+      protocol: 'naive',
+      settings: { domain: 'proxy.example.test', clients: [] },
+      streamSettings: {
+        network: 'tcp',
+        tcpSettings: {},
+        security: 'tls',
+        tlsSettings: { certificates: [fileCert] },
+      },
+    };
+    expect(InboundFormSchema.safeParse(inbound).success).toBe(true);
+
+    const noTls = InboundFormSchema.safeParse({
+      ...inbound,
+      streamSettings: { network: 'tcp', tcpSettings: {}, security: 'none' },
+    });
+    expect(noTls.success).toBe(false);
+    if (!noTls.success) {
+      expect(noTls.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['streamSettings', 'security'],
+          message: 'pages.inbounds.naive.tlsRequired',
+        }),
+      );
+    }
+
+    const noDomain = InboundFormSchema.safeParse({
+      ...inbound,
+      settings: { domain: '  ', clients: [] },
+    });
+    expect(noDomain.success).toBe(false);
+    if (!noDomain.success) {
+      expect(noDomain.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['settings', 'domain'],
+          message: 'pages.inbounds.naive.domainRequired',
+        }),
+      );
+    }
+  });
+
   it('keeps Reality, unsecured, transportless and outbound TLS certificate-free', () => {
     for (const security of [{ security: 'reality', realitySettings: {} }, { security: 'none' }]) {
       expect(

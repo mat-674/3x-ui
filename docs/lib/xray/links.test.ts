@@ -6,6 +6,7 @@ import {
   buildVmess,
   buildTrojan,
   buildShadowsocks,
+  buildNaive,
 } from './links';
 
 describe('detectProtocol', () => {
@@ -71,7 +72,43 @@ describe('parseLink — vmess', () => {
 });
 
 describe('parseLink — shadowsocks', () => {
-  it('parses SIP002 with base64 userinfo', () => {
+  it('parses NaiveProxy native share links', () => {
+    const r = parseLink('naive+https://alice%40example.com:p%40ss@example.com:443#naive-node');
+    expect(r.protocol).toBe('naive+https');
+    expect(r.address).toBe('example.com');
+    expect(r.port).toBe(443);
+    expect(r.credential).toBe('alice@example.com');
+    expect(r.name).toBe('naive-node');
+  });
+
+  it('builds a NaiveProxy link with encoded Basic Auth credentials', () => {
+    expect(
+      buildNaive({
+        username: 'alice@example.com',
+        password: 'p@ss',
+        address: 'example.com',
+        port: 443,
+        name: 'naive-node',
+      }),
+    ).toBe('naive+https://alice%40example.com:p%40ss@example.com:443#naive-node');
+  });
+
+  it('preserves external endpoint TLS metadata', () => {
+    const link = buildNaive({
+      username: 'alice@example.com',
+      password: 'p@ss',
+      address: 'edge.example.com',
+      port: 9443,
+      sni: 'origin.example.com',
+      allowInsecure: true,
+    });
+    expect(link).toBe(
+      'naive+https://alice%40example.com:p%40ss@edge.example.com:9443?allow_insecure=1&sni=origin.example.com',
+    );
+    expect(parseLink(link).params).toEqual({ allow_insecure: '1', sni: 'origin.example.com' });
+  });
+
+  it('parses a SIP002 with base64 userinfo', () => {
     const link = buildShadowsocks({
       method: 'aes-256-gcm',
       password: 's3cret',

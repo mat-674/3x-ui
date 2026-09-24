@@ -1,38 +1,82 @@
 #!/bin/sh
 set -e
-case $1 in
+TARGET_ARCH=${1:-amd64}
+TARGET_VARIANT=${2:-}
+case "$TARGET_ARCH" in
     amd64)
         ARCH="64"
         FNAME="amd64"
+        CADDY_GOARCH="amd64"
+        CADDY_GOARM=""
         ;;
-    i386)
+    386 | i386)
         ARCH="32"
         FNAME="i386"
+        CADDY_GOARCH="386"
+        CADDY_GOARM=""
         ;;
-    armv8 | arm64 | aarch64)
+    arm64 | aarch64)
         ARCH="arm64-v8a"
         FNAME="arm64"
+        CADDY_GOARCH="arm64"
+        CADDY_GOARM=""
         ;;
-    armv7 | arm | arm32)
-        ARCH="arm32-v7a"
-        FNAME="arm32"
+    arm)
+        case "$TARGET_VARIANT" in
+            v6)
+                ARCH="arm32-v6"
+                FNAME="armv6"
+                CADDY_GOARM="6"
+                ;;
+            v7 | "")
+                ARCH="arm32-v7a"
+                FNAME="arm32"
+                CADDY_GOARM="7"
+                ;;
+            *)
+                echo "DockerInit: unsupported ARM variant: $TARGET_VARIANT" >&2
+                exit 1
+                ;;
+        esac
+        CADDY_GOARCH="arm"
         ;;
-    armv6)
-        ARCH="arm32-v6"
-        FNAME="armv6"
+    armv8 | armv7 | armv6)
+        case "$TARGET_ARCH" in
+            armv8)
+                ARCH="arm64-v8a"
+                FNAME="arm64"
+                CADDY_GOARCH="arm64"
+                CADDY_GOARM=""
+                ;;
+            armv7)
+                ARCH="arm32-v7a"
+                FNAME="arm32"
+                CADDY_GOARCH="arm"
+                CADDY_GOARM="7"
+                ;;
+            armv6)
+                ARCH="arm32-v6"
+                FNAME="armv6"
+                CADDY_GOARCH="arm"
+                CADDY_GOARM="6"
+                ;;
+        esac
         ;;
     *)
-        ARCH="64"
-        FNAME="amd64"
+        echo "DockerInit: unsupported architecture: $TARGET_ARCH" >&2
+        exit 1
         ;;
 esac
+ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+BIN_DIR="$ROOT_DIR/build/bin"
+mkdir -p "$BIN_DIR"
+"$ROOT_DIR/tools/build-naive-caddy.sh" "$BIN_DIR/caddy-linux-$CADDY_GOARCH" linux "$CADDY_GOARCH" "$CADDY_GOARM"
+cd "$BIN_DIR"
 MTG_MULTI_VER=$(curl -sfL "https://api.github.com/repos/mhsanaei/mtg-multi/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1)
 if [ -z "$MTG_MULTI_VER" ]; then
     echo "DockerInit: could not resolve the latest mtg-multi release tag" >&2
     exit 1
 fi
-mkdir -p build/bin
-cd build/bin
 curl -sfLRO "https://github.com/XTLS/Xray-core/releases/download/v26.9.9/Xray-linux-${ARCH}.zip"
 unzip "Xray-linux-${ARCH}.zip"
 rm -f "Xray-linux-${ARCH}.zip" geoip.dat geosite.dat

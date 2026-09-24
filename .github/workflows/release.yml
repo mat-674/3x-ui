@@ -12,6 +12,8 @@ on:
       - "go.mod"
       - "go.sum"
       - "**.sh"
+      - "Dockerfile"
+      - "tools/**"
       - "frontend/**"
       - "x-ui.service.debian"
       - "x-ui.service.arch"
@@ -23,6 +25,8 @@ on:
       - "go.mod"
       - "go.sum"
       - "**.sh"
+      - "Dockerfile"
+      - "tools/**"
       - "frontend/**"
       - "x-ui.service.debian"
       - "x-ui.service.arch"
@@ -122,6 +126,18 @@ jobs:
           mv x-ui/xui-release x-ui/x-ui
           mkdir x-ui/bin
           cd x-ui/bin
+
+          case "${{ matrix.platform }}" in
+            amd64) CADDY_GOARCH="amd64"; CADDY_GOARM="" ;;
+            arm64) CADDY_GOARCH="arm64"; CADDY_GOARM="" ;;
+            armv7) CADDY_GOARCH="arm"; CADDY_GOARM="7" ;;
+            armv6) CADDY_GOARCH="arm"; CADDY_GOARM="6" ;;
+            armv5) CADDY_GOARCH="arm"; CADDY_GOARM="5" ;;
+            386) CADDY_GOARCH="386"; CADDY_GOARM="" ;;
+            s390x) CADDY_GOARCH="s390x"; CADDY_GOARM="" ;;
+            *) echo "Unsupported Caddy target: ${{ matrix.platform }}" >&2; exit 1 ;;
+          esac
+          ../../tools/build-naive-caddy.sh "caddy-linux-${CADDY_GOARCH}" linux "$CADDY_GOARCH" "$CADDY_GOARM"
 
           # Download dependencies
           Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.9.9/"
@@ -299,13 +315,20 @@ jobs:
           fi
           go build -buildvcs=true -ldflags "$LDFLAGS" -o xui-release.exe -v .
 
+      - name: Build Naive Caddy for Windows
+        shell: msys2 {0}
+        run: |
+          export PATH="/c/hostedtoolcache/windows/go/$(ls /c/hostedtoolcache/windows/go | sort -V | tail -n1)/x64/bin:$PATH"
+          mkdir -p x-ui/bin
+          ./tools/build-naive-caddy.sh x-ui/bin/caddy-windows-amd64.exe windows amd64
+
       - name: Copy and download resources
         shell: pwsh
         run: |
           $retry = @{ MaximumRetryCount = 5; RetryIntervalSec = 10 }
-          mkdir x-ui
+          New-Item -ItemType Directory -Force -Path x-ui | Out-Null
           Copy-Item xui-release.exe x-ui\x-ui.exe
-          mkdir x-ui\bin
+          New-Item -ItemType Directory -Force -Path x-ui\bin | Out-Null
           cd x-ui\bin
 
           # Download Xray for Windows

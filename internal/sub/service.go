@@ -626,7 +626,7 @@ func (s *SubService) getInboundsBySubId(subId string) ([]*model.Inbound, error) 
 		JOIN client_inbounds ON client_inbounds.inbound_id = inbounds.id
 		JOIN clients ON clients.id = client_inbounds.client_id
 		WHERE
-			inbounds.protocol in ('vmess','vless','trojan','shadowsocks','hysteria','wireguard','amneziawg','mtproto','tuic')
+			inbounds.protocol in ('vmess','vless','trojan','shadowsocks','hysteria','wireguard','amneziawg','mtproto','tuic','naive')
 			AND clients.sub_id = ? AND inbounds.enable = ?
 	)`, subId, true).Order("sub_sort_index ASC").Order("id ASC").Find(&inbounds).Error
 	if err != nil {
@@ -781,8 +781,101 @@ func (s *SubService) GetLink(inbound *model.Inbound, email string) string {
 		return s.genAmneziaWGLink(inbound, email)
 	case "tuic":
 		return s.genTuicLink(inbound, email)
+	case model.Naive:
+		return s.genNaiveLink(inbound, email)
 	}
 	return ""
+}
+
+func (s *SubService) genNaiveLink(inbound *model.Inbound, email string) string {
+	if inbound.Protocol != model.Naive {
+		return ""
+	}
+	client, ok := s.clientForLink(inbound, email)
+	if !ok || client.Email == "" || client.Password == "" {
+		return ""
+	}
+
+	stream := unmarshalStreamSettings(inbound.StreamSettings)
+	endpoints, _ := stream["externalProxy"].([]any)
+	if len(endpoints) > 0 {
+		links := make([]string, 0, len(endpoints))
+		for _, raw := range endpoints {
+			ep, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			host, _ := ep["dest"].(string)
+			port := inbound.Port
+			if configuredPort, ok := ep["port"].(float64); ok && configuredPort > 0 {
+				port = int(configuredPort)
+			}
+			if host == "" {
+				host = s.resolveInboundAddress(inbound)
+			}
+			remark := s.endpointRemark(inbound, email, ep, "")
+			if link := naiveShareURL(client.Email, client.Password, host, port, remark, naiveLinkOptionsFromEndpoint(ep)); link != "" {
+				links = append(links, link)
+			}
+		}
+		if len(links) > 0 {
+			return strings.Join(links, "\n")
+		}
+	}
+
+	return naiveShareURL(client.Email, client.Password, s.resolveInboundAddress(inbound), inbound.Port, s.genRemark(inbound, email, "", ""), naiveLinkOptions{})
+}
+
+type naiveLinkOptions struct {
+	sni           string
+	allowInsecure bool
+}
+
+func naiveLinkOptionsFromEndpoint(ep map[string]any) naiveLinkOptions {
+	if ep == nil {
+		return naiveLinkOptions{}
+	}
+	sni, _ := ep["sni"].(string)
+	allowInsecure, _ := ep["allowInsecure"].(bool)
+	return naiveLinkOptions{sni: strings.TrimSpace(sni), allowInsecure: allowInsecure}
+}
+
+func applyNaiveLinkOptions(u *url.URL, options naiveLinkOptions) {
+	query := u.Query()
+	if options.sni != "" {
+		query.Set("sni", options.sni)
+	}
+	if options.allowInsecure {
+		query.Set("allow_insecure", "1")
+	}
+	u.RawQuery = query.Encode()
+}
+
+func naiveShareURL(email, password, host string, port int, remark string, options naiveLinkOptions) string {
+	if email == "" || password == "" || host == "" || port < 1 || port > 65535 {
+		return ""
+	}
+	u := url.URL{
+		Scheme:   "naive+https",
+		Host:     net.JoinHostPort(strings.Trim(host, "[]"), strconv.Itoa(port)),
+		User:     url.UserPassword(email, password),
+		Fragment: remark,
+	}
+	applyNaiveLinkOptions(&u, options)
+	return u.String()
+}
+
+func naiveClientProxyURL(email, password, host string, port int, options naiveLinkOptions) string {
+	if email == "" || password == "" || host == "" || port < 1 || port > 65535 {
+		return ""
+	}
+	u := url.URL{
+		Scheme: "https",
+		Host:   net.JoinHostPort(strings.Trim(host, "[]"), strconv.Itoa(port)),
+		User:   url.UserPassword(email, password),
+	}
+	applyNaiveLinkOptions(&u, options)
+	return u.String()
 }
 
 func (s *SubService) genTuicLink(inbound *model.Inbound, email string) string {
@@ -1595,6 +1688,11 @@ func (s *SubService) loadNodes() {
 // listen is a server-side detail and is never advertised; External Proxy still
 // overrides everything upstream of this call.
 func (s *SubService) resolveInboundAddress(inbound *model.Inbound) string {
+	if inbound.Protocol == model.Naive {
+		if domain, _ := s.linkSettings(inbound)["domain"].(string); strings.TrimSpace(domain) != "" {
+			return strings.TrimSpace(domain)
+		}
+	}
 	var nodeAddr string
 	if inbound.NodeID != nil && s.nodesByID != nil {
 		if n, ok := s.nodesByID[*inbound.NodeID]; ok {

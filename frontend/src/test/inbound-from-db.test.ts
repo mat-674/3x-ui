@@ -244,6 +244,19 @@ describe('getInboundClients with schema-shaped inbound', () => {
     expect(getInboundClients(inbound)).toHaveLength(1);
   });
 
+  it('returns clients for a Naive inbound', () => {
+    const inbound = inboundFromDb({
+      ...BASE_DB_FIELDS,
+      protocol: 'naive',
+      settings: {
+        domain: 'naive.example.test',
+        clients: [{ email: 'alice@test', password: 'secret' }],
+      },
+      streamSettings: '',
+    });
+    expect(getInboundClients(inbound)).toMatchObject([{ email: 'alice@test', password: 'secret' }]);
+  });
+
   it('returns null for SS single-user', () => {
     const inbound = inboundFromDb({
       ...BASE_DB_FIELDS,

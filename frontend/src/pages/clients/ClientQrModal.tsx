@@ -6,7 +6,7 @@ import { LockOutlined } from '@ant-design/icons';
 import { HttpUtil } from '@/utils';
 import type { HappLinkResult } from '@/generated/types';
 import { HappLinkResultSchema } from '@/generated/zod';
-import { isPostQuantumLink } from '@/lib/xray/inbound-link';
+import { genNaiveClientConfig, isPostQuantumLink } from '@/lib/xray/inbound-link';
 import { LinkTags, linkMetaText, parseLinkParts } from '@/lib/xray/link-label';
 import { QrPanel } from '@/pages/inbounds/qr';
 import type { ClientRecord, InboundOption } from '@/hooks/useClients';
@@ -372,6 +372,13 @@ function ClientQrModalContent({
       subSettings.publicHost ?? '',
     );
   }, [client, tuicInbound, subSettings.publicHost]);
+  const naiveConfigs = useMemo(
+    () =>
+      links
+        .map((link) => ({ link, text: genNaiveClientConfig(link) }))
+        .filter(({ text }) => text.length > 0),
+    [links],
+  );
 
   const hasAnything =
     !!subLink ||
@@ -468,6 +475,29 @@ function ClientQrModalContent({
         ),
       });
     });
+    naiveConfigs.forEach(({ link, text }, idx) => {
+      const parts = parseLinkParts(link);
+      const endpoint = parts ? linkMetaText(parts) : '';
+      const label = (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Tag color="green" style={{ margin: 0 }}>
+            {t('pages.clients.naiveConfig')}
+          </Tag>
+          {endpoint && <span style={{ opacity: 0.85, fontSize: 12 }}>{endpoint}</span>}
+        </span>
+      );
+      out.push({
+        key: `naive-config-${idx}`,
+        label,
+        children: (
+          <QrPanel
+            value={text}
+            remark={`${client?.email || ''} — ${t('pages.clients.naiveConfig')}`}
+            downloadName={`${client?.email || 'naive'}${naiveConfigs.length > 1 ? `-${idx + 1}` : ''}.json`}
+          />
+        ),
+      });
+    });
     wgConfigs.forEach(({ inbound, text }) => {
       const meta = formatTunnelConfigMeta(inbound, client?.email, wgConfigs.length);
       const label = (
@@ -528,6 +558,7 @@ function ClientQrModalContent({
     happLinkEnabled,
     wgConfigs,
     awgConfigs,
+    naiveConfigs,
     links,
     client?.email,
     selectVariant,

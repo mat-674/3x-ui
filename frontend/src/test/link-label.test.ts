@@ -87,6 +87,17 @@ describe('link-label parseLinkParts', () => {
     expect(parts && linkMetaText(parts)).toBe('wg-Майфун:36541');
   });
 
+  it('labels a naive+https link as NaiveProxy with TLS security', () => {
+    const parts = parseLinkParts(
+      'naive+https://alice%40example.com:p%40ss@naive.example.com:443#naive-remark',
+    );
+    expect(parts?.protocol).toBe('NaiveProxy');
+    expect(parts?.network).toBe('');
+    expect(parts?.security).toBe('TLS');
+    expect(parts?.port).toBe('443');
+    expect(parts?.remark).toBe('naive-remark');
+  });
+
   it('labels a tuic link with QUIC network and TLS security', () => {
     const link = 'tuic://uuid:pass@tuic.example.com:8443?congestion_control=bbr#tuic-remark';
     const parts = parseLinkParts(link);

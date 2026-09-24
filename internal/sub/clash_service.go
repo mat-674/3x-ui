@@ -395,6 +395,9 @@ func (s *SubClashService) getProxies(subReq *SubService, inbound *model.Inbound,
 }
 
 func (s *SubClashService) buildProxy(subReq *SubService, inbound *model.Inbound, client model.Client, stream map[string]any, ep map[string]any) map[string]any {
+	if inbound.Protocol == model.Naive {
+		return s.buildNaiveProxy(subReq, inbound, client, ep)
+	}
 	// Hysteria has its own transport + TLS model, applyTransport /
 	// applySecurity don't fit.
 	if inbound.Protocol == model.Hysteria {
@@ -476,6 +479,37 @@ func (s *SubClashService) buildProxy(subReq *SubService, inbound *model.Inbound,
 // directly instead of going through streamData/tlsData, because those
 // helpers prune fields (like `allowInsecure` / the salamander obfs
 // block) that the hysteria proxy wants preserved.
+func (s *SubClashService) buildNaiveProxy(subReq *SubService, inbound *model.Inbound, client model.Client, ep map[string]any) map[string]any {
+	if client.Email == "" || client.Password == "" {
+		return nil
+	}
+	server := strings.Trim(inbound.Listen, "[]")
+	if server == "" || server == "0.0.0.0" || server == "::" {
+		server = subReq.resolveInboundAddress(inbound)
+	}
+	if server == "" || inbound.Port < 1 || inbound.Port > 65535 {
+		return nil
+	}
+
+	proxy := map[string]any{
+		"name":       subReq.endpointRemark(inbound, client.Email, ep, ""),
+		"type":       "http",
+		"server":     server,
+		"port":       inbound.Port,
+		"username":   client.Email,
+		"password":   client.Password,
+		"tls":        true,
+		"servername": server,
+	}
+	if sni, ok := externalProxySNI(ep); ok {
+		proxy["servername"] = sni
+	}
+	if insecure, ok := ep["allowInsecure"].(bool); ok && insecure {
+		proxy["skip-cert-verify"] = true
+	}
+	return proxy
+}
+
 func (s *SubClashService) buildHysteriaProxy(subReq *SubService, inbound *model.Inbound, client model.Client, ep map[string]any) map[string]any {
 	inboundSettings := subReq.linkSettings(inbound)
 

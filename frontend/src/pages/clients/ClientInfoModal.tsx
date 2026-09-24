@@ -15,7 +15,7 @@ import { normalizeClientIps, type ClientIpInfo } from '@/lib/clients/ip-log';
 import { useDatepicker } from '@/hooks/useDatepicker';
 import { useClientHwids } from '@/hooks/useClientHwids';
 import type { ClientRecord, InboundOption } from '@/hooks/useClients';
-import { isPostQuantumLink } from '@/lib/xray/inbound-link';
+import { genNaiveClientConfig, isPostQuantumLink } from '@/lib/xray/inbound-link';
 import { LinkTags, linkMetaText, parseLinkParts } from '@/lib/xray/link-label';
 import { QrPanel } from '@/pages/inbounds/qr';
 import ClientHwidListModal from '@/components/clients/ClientHwidList';
@@ -45,6 +45,7 @@ const INBOUND_PROTOCOL_COLORS: Record<string, string> = {
   mixed: 'lime',
   tunnel: 'orange',
   tuic: 'orange',
+  naive: 'green',
 };
 
 const INBOUND_CHIP_LIMIT = 1;
@@ -222,6 +223,13 @@ export default function ClientInfoModal({
       })
       .filter((c) => !!c.text);
   }, [client, awgInbounds, tunnelAllowedIPs, subSettings?.publicHost]);
+  const naiveConfigs = useMemo(
+    () =>
+      links
+        .map((link) => ({ link, text: genNaiveClientConfig(link) }))
+        .filter(({ text }) => text.length > 0),
+    [links],
+  );
 
   async function copyValue(text: string) {
     if (!text) return;
@@ -787,6 +795,29 @@ export default function ClientInfoModal({
                         )}
                       </div>
                     </div>
+                  );
+                })}
+              </>
+            )}
+
+            {naiveConfigs.length > 0 && client && (
+              <>
+                <Divider>{t('pages.clients.naiveConfig')}</Divider>
+                {naiveConfigs.map(({ link, text }, idx) => {
+                  const parts = parseLinkParts(link);
+                  return (
+                    <ConfigBlock
+                      key={`naive-${idx}`}
+                      label={
+                        parts?.remark
+                          ? `${t('pages.clients.naiveConfig')} - ${parts.remark}`
+                          : t('pages.clients.naiveConfig')
+                      }
+                      text={text}
+                      fileName={`${client.email || 'naive'}${naiveConfigs.length > 1 ? `-${idx + 1}` : ''}.json`}
+                      qrRemark={`${client.email} — ${t('pages.clients.naiveConfig')}`}
+                      tagColor="green"
+                    />
                   );
                 })}
               </>

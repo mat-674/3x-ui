@@ -8,6 +8,8 @@ import {
   genAllLinks,
   genHysteriaLink,
   genInboundLinks,
+  genNaiveClientConfig,
+  genNaiveLink,
   genShadowsocksLink,
   genTrojanLink,
   genTuicLink,
@@ -763,6 +765,83 @@ describe('genInboundLinks orchestrator', () => {
       expect(block).toMatchSnapshot();
     });
   }
+});
+
+describe('genNaiveLink', () => {
+  const fixtures = fixturesForProtocol('naive');
+  expect(fixtures.length, 'need at least one naive full-inbound fixture').toBeGreaterThan(0);
+
+  for (const [name, raw] of fixtures) {
+    it(`${name}: emits a Naive link and native client config`, () => {
+      const inbound = InboundSchema.parse(raw);
+      if (inbound.protocol !== 'naive') throw new Error('not a Naive fixture');
+      const client = inbound.settings.clients[0];
+      if (!client) throw new Error('Naive fixture has no client');
+
+      const link = genNaiveLink({
+        inbound,
+        address: 'override.test',
+        remark: 'parity-test',
+        clientEmail: client.email,
+        clientPassword: client.password,
+      });
+
+      expect(link).toMatchSnapshot();
+      expect(JSON.parse(genNaiveClientConfig(link))).toEqual({
+        listen: 'socks://127.0.0.1:1080',
+        proxy: 'https://alice%40example.test:naive-secret@naive.example.test:8443',
+      });
+    });
+  }
+
+  it('uses a configured external endpoint and returns empty for missing credentials or invalid hosts', () => {
+    const [, raw] = fixtures[0];
+    const inbound = InboundSchema.parse(raw);
+    if (inbound.protocol !== 'naive') throw new Error('not a Naive fixture');
+    const client = inbound.settings.clients[0];
+    if (!client) throw new Error('Naive fixture has no client');
+    const externalProxy = {
+      forceTls: 'same' as const,
+      dest: 'edge.example.test',
+      port: 9443,
+      remark: 'edge',
+      sni: 'origin.example.test',
+      allowInsecure: true,
+    };
+
+    const link = genNaiveLink({
+      inbound,
+      address: 'override.test',
+      remark: 'edge',
+      clientEmail: client.email,
+      clientPassword: client.password,
+      externalProxy,
+    });
+    expect(new URL(link).host).toBe('edge.example.test:9443');
+    expect(new URL(link).searchParams.get('sni')).toBe('origin.example.test');
+    expect(new URL(link).searchParams.get('allow_insecure')).toBe('1');
+    expect(JSON.parse(genNaiveClientConfig(link)).proxy).toBe(
+      'https://alice%40example.test:naive-secret@edge.example.test:9443?allow_insecure=1&sni=origin.example.test',
+    );
+    expect(
+      genNaiveLink({
+        inbound,
+        address: 'override.test',
+        clientEmail: client.email,
+        clientPassword: '',
+      }),
+    ).toBe('');
+    expect(
+      genNaiveLink({
+        inbound,
+        address: 'override.test',
+        clientEmail: client.email,
+        clientPassword: client.password,
+        externalProxy: { ...externalProxy, dest: 'invalid host' },
+      }),
+    ).toBe('');
+    expect(genNaiveClientConfig('not-a-link')).toBe('');
+  });
 });
 
 describe('genShadowsocksLink', () => {

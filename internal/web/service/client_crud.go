@@ -310,25 +310,36 @@ func fanoutInboundResults[T any](inboundIds []int, limit int, run func(i int) T)
 	out := make([]T, len(inboundIds))
 	errs := make([]error, len(inboundIds))
 	sem := make(chan struct{}, limit)
-	var wg sync.WaitGroup
-	for i := range inboundIds {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func() {
-			defer wg.Done()
-			defer func() { <-sem }()
-			// Off the request goroutine gin's Recovery no longer covers this,
-			// so an unrecovered panic here would take the whole panel down.
-			defer func() {
-				if r := recover(); r != nil {
-					errs[i] = fmt.Errorf("inbound %d: panic: %v", inboundIds[i], r)
-					logger.Errorf("panic applying bulk client change to inbound %d: %v\n%s", inboundIds[i], r, debug.Stack())
-				}
-			}()
-			out[i] = run(i)
-		}()
+	type fanoutResult struct {
+		index int
+		value T
+		err   error
 	}
-	wg.Wait()
+	results := make(chan fanoutResult, len(inboundIds))
+	for i := range inboundIds {
+		idx := i
+		sem <- struct{}{}
+		go func(idx, inboundID int) {
+			defer func() { <-sem }()
+			var value T
+			var err error
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						err = fmt.Errorf("inbound %d: panic: %v", inboundID, r)
+						logger.Errorf("panic applying bulk client change to inbound %d: %v\\n%s", inboundID, r, debug.Stack())
+					}
+				}()
+				value = run(idx)
+			}()
+			results <- fanoutResult{index: idx, value: value, err: err}
+		}(idx, inboundIds[idx])
+	}
+	for range inboundIds {
+		result := <-results
+		out[result.index] = result.value
+		errs[result.index] = result.err
+	}
 	return out, errs
 }
 
@@ -410,6 +421,10 @@ func (s *ClientService) fillProtocolDefaults(c *model.Client, ib *model.Inbound)
 		if c.ID == "" {
 			c.ID = uuid.NewString()
 		}
+		if c.Password == "" {
+			c.Password = strings.ReplaceAll(uuid.NewString(), "-", "")
+		}
+	case model.Naive:
 		if c.Password == "" {
 			c.Password = strings.ReplaceAll(uuid.NewString(), "-", "")
 		}

@@ -139,6 +139,32 @@ describe('ClientQrModal Happ presentation', () => {
     expect(HttpUtil.post).not.toHaveBeenCalled();
   });
 
+  it('provides native Naive JSON as a QR config', async () => {
+    const link = 'naive+https://alice%40example.com:naive-secret@naive.example.test:443#naive-01';
+    vi.mocked(HttpUtil.get).mockResolvedValueOnce(new Msg<string[]>(true, '', [link]));
+    renderSubject({
+      subSettings: {
+        enable: false,
+        subURI: '',
+        subJsonURI: '',
+        subJsonEnable: false,
+      },
+    });
+
+    fireEvent.click(await screen.findByText('NaiveProxy client config'));
+    await waitFor(() => {
+      const values = screen
+        .getAllByTestId('qr-panel-value')
+        .map((panel) => panel.textContent ?? '');
+      expect(values.some((value) => value.includes('"listen": "socks://127.0.0.1:1080"'))).toBe(
+        true,
+      );
+      expect(values.some((value) => value.includes('"proxy": "https://alice%40example.com'))).toBe(
+        true,
+      );
+    });
+  });
+
   it('names the Happ option as an encrypted link', () => {
     renderSubject();
 

@@ -632,13 +632,8 @@ func (s *InboundService) emailSubIDsForClients(clients []model.Client) (map[stri
 	return result, nil
 }
 
-// normalizeStreamSettings clears StreamSettings for protocols that don't use it.
-// Only vmess, vless, trojan, shadowsocks, hysteria, wireguard, and tunnel
-// protocols use streamSettings (wireguard for finalmask UDP masks and sockopt on
-// its listener; tunnel for sockopt, notably sockopt.tproxy for its TProxy/redirect
-// mode). Streams keyed on "method" — xray-core v26.7.11's preferred alias for
-// "network" — are canonicalized to "network", which every panel reader (link
-// generation, port-conflict detection, flow eligibility) keys on.
+// normalizeStreamSettings preserves transport data used by Xray-backed and
+// sidecar-managed protocols. Naive reads its TLS certificate from this block.
 func (s *InboundService) normalizeStreamSettings(inbound *model.Inbound) {
 	protocolsWithStream := map[model.Protocol]bool{
 		model.VMESS:       true,
@@ -648,6 +643,7 @@ func (s *InboundService) normalizeStreamSettings(inbound *model.Inbound) {
 		model.Hysteria:    true,
 		model.WireGuard:   true,
 		model.Tunnel:      true,
+		model.Naive:       true,
 	}
 
 	if !protocolsWithStream[inbound.Protocol] {
@@ -683,6 +679,19 @@ func canonicalizeStreamNetworkKey(streamSettings string) string {
 
 // validateInboundTLSCertificates rejects incomplete TLS credentials before a save
 // can restart Xray. File paths belong to the node, so only presence is checked.
+func validateNaiveTLS(protocol model.Protocol, streamSettings string) error {
+	if protocol != model.Naive {
+		return nil
+	}
+	var stream struct {
+		Security string `json:"security"`
+	}
+	if err := json.Unmarshal([]byte(streamSettings), &stream); err != nil || !strings.EqualFold(stream.Security, "tls") {
+		return common.NewError("Naive requires TLS. Configure TLS in the security tab before saving the inbound.")
+	}
+	return nil
+}
+
 func validateInboundTLSCertificates(streamSettings string) error {
 	if strings.TrimSpace(streamSettings) == "" {
 		return nil
@@ -1098,6 +1107,9 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 	// Normalize streamSettings based on protocol
 	s.normalizeStreamSettings(inbound)
 	if !s.FromNodeSync {
+		if err := validateNaiveTLS(inbound.Protocol, inbound.StreamSettings); err != nil {
+			return inbound, false, err
+		}
 		if err := validateInboundTLSCertificates(inbound.StreamSettings); err != nil {
 			return inbound, false, err
 		}
@@ -1216,6 +1228,13 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 			if client.Email == "" {
 				return inbound, false, common.NewError("empty client email")
 			}
+		case "naive":
+			if client.Password == "" {
+				return inbound, false, common.NewError("naive client requires a password")
+			}
+			if client.Email == "" {
+				return inbound, false, common.NewError("empty client email")
+			}
 		default:
 			if client.ID == "" {
 				return inbound, false, common.NewError("empty client ID")
@@ -1317,7 +1336,7 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 				if push {
 					payload := inbound
 					pushable := true
-					if inbound.Protocol == model.MTProto || inbound.Protocol == model.TUIC {
+					if inbound.Protocol == model.MTProto || inbound.Protocol == model.TUIC || inbound.Protocol == model.Naive {
 						if built, bErr := s.buildInboundForLocalRuntime(tx, inbound); bErr == nil {
 							payload = built
 						} else {
@@ -1331,7 +1350,7 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 								logger.Debug("New inbound added on", rt.Name(), ":", inbound.Tag)
 							} else {
 								logger.Debug("Unable to add inbound on", rt.Name(), ":", err1)
-								if inbound.Protocol != model.MTProto && inbound.Protocol != model.TUIC {
+								if inbound.Protocol != model.MTProto && inbound.Protocol != model.TUIC && inbound.Protocol != model.Naive {
 									needRestart = true
 								}
 							}
@@ -1709,7 +1728,7 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 			}
 		}
 	}
-	if inbound.Protocol == model.TUIC {
+	if oldInbound.Protocol == model.TUIC {
 		for _, client := range clients {
 			if client.ID == "" {
 				return inbound, false, common.NewError("empty client ID")
@@ -1722,10 +1741,23 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 			}
 		}
 	}
+	if inbound.Protocol == model.Naive {
+		for _, client := range clients {
+			if client.Password == "" {
+				return inbound, false, common.NewError("naive client requires a password")
+			}
+			if client.Email == "" {
+				return inbound, false, common.NewError("empty client email")
+			}
+		}
+	}
 
 	// Grandfather a row that was already stored incomplete so it stays editable;
 	// only a save that breaks a previously valid TLS block is refused.
 	if !s.FromNodeSync {
+		if err := validateNaiveTLS(inbound.Protocol, inbound.StreamSettings); err != nil {
+			return inbound, false, err
+		}
 		if err := validateInboundTLSCertificates(inbound.StreamSettings); err != nil {
 			if validateInboundTLSCertificates(oldInbound.StreamSettings) == nil {
 				return inbound, false, err
@@ -1895,7 +1927,7 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 			}
 			if !push {
 				needRestart = true
-			} else if oldProtocol == model.MTProto || oldInbound.Protocol == model.MTProto || oldProtocol == model.TUIC || oldInbound.Protocol == model.TUIC {
+			} else if oldProtocol == model.MTProto || oldInbound.Protocol == model.MTProto || oldProtocol == model.TUIC || oldInbound.Protocol == model.TUIC || oldProtocol == model.Naive || oldInbound.Protocol == model.Naive {
 				oldSnapshot := *oldInbound
 				oldSnapshot.Tag = tag
 				oldSnapshot.Protocol = oldProtocol
@@ -1909,7 +1941,7 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 						pushable = false
 					}
 				}
-				newProtocolIsSidecar := oldInbound.Protocol == model.MTProto || oldInbound.Protocol == model.TUIC
+				newProtocolIsSidecar := oldInbound.Protocol == model.MTProto || oldInbound.Protocol == model.TUIC || oldInbound.Protocol == model.Naive
 				if pushable {
 					postCommitApply = func() {
 						if err2 := rt.UpdateInbound(context.Background(), &oldSnapshot, payload); err2 == nil {

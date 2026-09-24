@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import ClientInfoModal from '@/pages/clients/ClientInfoModal';
 import ClientQrModal from '@/pages/clients/ClientQrModal';
 import type { ClientRecord, InboundOption } from '@/hooks/useClients';
 import { renderWithProviders } from './test-utils';
+import { HttpUtil, Msg } from '@/utils';
 
 const deAwgInbound: InboundOption = {
   id: 101,
@@ -149,6 +150,34 @@ describe('Multi-tunnel Client Modals', () => {
     expect(screen.getAllByText('US · New York')).toHaveLength(2);
     expect(screen.getByText('EU · Frankfurt')).toBeTruthy();
     expect(document.querySelectorAll('.config-block')).toHaveLength(2);
+  });
+
+  it('renders a native Naive client config in ClientInfoModal', async () => {
+    const link = 'naive+https://alice%40example.com:naive-secret@naive.example.test:443#naive-01';
+    vi.mocked(HttpUtil.get).mockResolvedValueOnce(new Msg<string[]>(true, '', [link]));
+    const client = {
+      id: 'naive-client',
+      email: 'alice@example.com',
+      subId: 'naive-sub',
+      enable: true,
+    } as unknown as ClientRecord;
+
+    renderWithProviders(
+      <ClientInfoModal
+        open
+        client={client}
+        inboundsById={{}}
+        isOnline={false}
+        onOpenChange={() => {}}
+      />,
+    );
+
+    const label = await screen.findByText('NaiveProxy client config - naive-01');
+    fireEvent.click(label);
+    expect(await screen.findByText(/"listen": "socks:\/\/127\.0\.0\.1:1080"/)).toBeTruthy();
+    expect(document.querySelector('.config-block-text')?.textContent).toContain(
+      'https://alice%40example.com:naive-secret@naive.example.test:443',
+    );
   });
 
   it('renders single default-labeled ConfigBlock in ClientInfoModal for single inbound', () => {

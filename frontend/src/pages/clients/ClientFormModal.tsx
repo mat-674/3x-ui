@@ -64,6 +64,7 @@ const MULTI_CLIENT_PROTOCOLS = new Set([
   'mtproto',
   'amneziawg',
   'tuic',
+  'naive',
 ]);
 
 const CLIENT_FORM_MODAL_Z_INDEX = 1000;
@@ -648,6 +649,13 @@ export default function ClientFormModal({
 
   async function onSubmit() {
     const values = methods.getValues();
+    const hasNaiveInbound = (values.inboundIds || []).some((id) =>
+      inbounds.some((inbound) => inbound.id === id && inbound.protocol === 'naive'),
+    );
+    if (hasNaiveInbound && !values.password.trim()) {
+      messageApi.error(t('pages.clients.naivePasswordRequired'));
+      return;
+    }
     const schema = isEdit ? ClientFormSchema : ClientCreateFormSchema;
     const validated = schema.safeParse({
       email: values.email,

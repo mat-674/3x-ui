@@ -471,6 +471,13 @@ func (s *ClientService) AddInboundClient(inboundSvc *InboundService, data *model
 			if client.Email == "" {
 				return false, common.NewError("empty client email")
 			}
+		case "naive":
+			if client.Password == "" {
+				return false, common.NewError("naive client requires a password")
+			}
+			if client.Email == "" {
+				return false, common.NewError("empty client email")
+			}
 		default:
 			if client.ID == "" {
 				return false, common.NewError("empty client ID")
@@ -585,6 +592,8 @@ func (s *ClientService) AddInboundClient(inboundSvc *InboundService, data *model
 			inboundSvc.applyLocalAmneziaWG(oldInbound.Id)
 		} else if oldInbound.Protocol == model.TUIC {
 			inboundSvc.applyLocalTuic(oldInbound.Id)
+		} else if oldInbound.Protocol == model.Naive {
+			inboundSvc.applyLocalNaive(oldInbound.Id)
 		} else {
 			for _, client := range clients {
 				if len(client.Email) == 0 {
@@ -690,6 +699,8 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 		newClientId = clients[0].Email
 	case "mtproto":
 		newClientId = clients[0].Email
+	case model.Naive:
+		newClientId = clients[0].Email
 	default:
 		newClientId = clients[0].ID
 	}
@@ -711,6 +722,9 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 	}
 	if strings.TrimSpace(clients[0].Email) == "" {
 		return false, common.NewError("client email is required")
+	}
+	if oldInbound.Protocol == model.Naive && clients[0].Password == "" {
+		return false, common.NewError("naive client requires a password")
 	}
 	if oldInbound.Protocol == model.MTProto && clients[0].AdTag != "" && !model.ValidMtprotoAdTag(clients[0].AdTag) {
 		return false, common.NewError("mtproto client ad tag must be 32 hex characters")
@@ -1017,6 +1031,8 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 				inboundSvc.applyLocalAmneziaWG(oldInbound.Id)
 			} else if oldInbound.Protocol == model.TUIC {
 				inboundSvc.applyLocalTuic(oldInbound.Id)
+			} else if oldInbound.Protocol == model.Naive {
+				inboundSvc.applyLocalNaive(oldInbound.Id)
 			} else {
 				if oldClients[clientIndex].Enable {
 					err1 := rt.RemoveUser(context.Background(), oldInbound, oldEmail)
@@ -1209,6 +1225,8 @@ func (s *ClientService) DelInboundClientByEmail(inboundSvc *InboundService, inbo
 				inboundSvc.applyLocalAmneziaWG(oldInbound.Id)
 			} else if oldInbound.Protocol == model.TUIC {
 				inboundSvc.applyLocalTuic(oldInbound.Id)
+			} else if oldInbound.Protocol == model.Naive {
+				inboundSvc.applyLocalNaive(oldInbound.Id)
 			} else if needApiDel {
 				// Local inbound: a disabled client isn't in the running Xray, so only
 				// a live one (needApiDel) needs an API removal.

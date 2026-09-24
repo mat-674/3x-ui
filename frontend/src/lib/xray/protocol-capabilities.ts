@@ -5,7 +5,7 @@
 // called against a partial-row, a full form value, or a hand-built test
 // fixture without the caller projecting a whole object.
 
-const TLS_ELIGIBLE_PROTOCOLS = ['vmess', 'vless', 'trojan', 'shadowsocks'];
+const TLS_ELIGIBLE_PROTOCOLS = ['vmess', 'vless', 'trojan', 'shadowsocks', 'naive'];
 const TLS_NETWORKS = ['tcp', 'ws', 'http', 'grpc', 'httpupgrade', 'xhttp'];
 const REALITY_ELIGIBLE_PROTOCOLS = ['vless', 'trojan'];
 const REALITY_NETWORKS = ['tcp', 'http', 'grpc', 'xhttp'];
@@ -37,7 +37,7 @@ export interface CapabilityShadowsocksSlice extends CapabilityProtocolSlice {
 }
 
 export function canEnableTls(values: CapabilityProtocolSlice): boolean {
-  if (values.protocol === 'hysteria') return true;
+  if (values.protocol === 'hysteria' || values.protocol === 'naive') return true;
   if (!TLS_ELIGIBLE_PROTOCOLS.includes(values.protocol)) return false;
   return TLS_NETWORKS.includes(values.streamSettings?.network ?? '');
 }
@@ -75,12 +75,15 @@ export function canEnableStream(values: { protocol: string }): boolean {
   return STREAM_PROTOCOLS.includes(values.protocol);
 }
 
-// mtproto and amneziawg are served by an external process/interface, not
-// Xray, so the Xray sniffing block does not apply to either. Every other
+// mtproto, naive, amneziawg and tuic are served by external processes/interfaces,
+// so the Xray sniffing block does not apply to them. Every other
 // inbound supports sniffing.
 export function canEnableSniffing(values: { protocol: string }): boolean {
   return (
-    values.protocol !== 'mtproto' && values.protocol !== 'amneziawg' && values.protocol !== 'tuic'
+    values.protocol !== 'mtproto' &&
+    values.protocol !== 'naive' &&
+    values.protocol !== 'amneziawg' &&
+    values.protocol !== 'tuic'
   );
 }
 

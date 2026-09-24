@@ -130,6 +130,41 @@ describe('InboundFormModal', () => {
     }
   }, 30000); // iterates every protocol, re-rendering a heavy modal each time — slow on CI runners
 
+  it('shows Naive settings and a TLS-only Security tab without Xray Stream controls', async () => {
+    const inbound = new DBInbound({
+      id: 43,
+      port: 8443,
+      listen: '',
+      protocol: 'naive',
+      remark: 'naive proxy',
+      enable: true,
+      settings: { domain: 'proxy.example.test', clients: [] },
+      streamSettings: {
+        network: 'tcp',
+        tcpSettings: {},
+        security: 'tls',
+        tlsSettings: {
+          certificates: [{ certificateFile: '/etc/ssl/cert.pem', keyFile: '/etc/ssl/key.pem' }],
+        },
+      },
+      sniffing: { enabled: false },
+      nodeId: null,
+      shareAddrStrategy: 'listen',
+      shareAddr: '',
+    });
+    renderCloneLikeEdit(inbound);
+
+    expect(screen.getByRole('tab', { name: 'Protocol' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Security' })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Stream' })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Protocol' }));
+    expect(fieldLabels()).toContain('NaiveProxy domain');
+    fireEvent.click(screen.getByRole('tab', { name: 'Security' }));
+    expect(screen.getByRole('radio', { name: 'TLS' })).toBeTruthy();
+    expect(screen.queryByRole('radio', { name: 'None' })).toBeNull();
+    expect(screen.getByDisplayValue('/etc/ssl/cert.pem')).toBeTruthy();
+  });
+
   it('preserves custom share address strategy when editing a local inbound', async () => {
     renderWithProviders(
       <InboundFormModal

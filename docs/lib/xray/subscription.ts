@@ -6,7 +6,7 @@
 // (buildStreamSettings). No React/DOM imports.
 
 import { textToBase64 } from './base64';
-import { buildVless, buildVmess, buildTrojan, buildShadowsocks } from './links';
+import { buildVless, buildVmess, buildTrojan, buildShadowsocks, buildNaive } from './links';
 import { buildStreamSettings, type Network, type Security } from './outbounds';
 
 export interface SubUrlInput {
@@ -26,13 +26,15 @@ export interface SubUrls {
 }
 
 export interface SubClient {
-  protocol: 'vless' | 'vmess' | 'trojan' | 'ss';
+  protocol: 'vless' | 'vmess' | 'trojan' | 'ss' | 'naive+https';
   remark: string;
   address: string;
   port: number;
   // credentials
   id?: string; // vless / vmess uuid
-  password?: string; // trojan / ss
+  username?: string; // NaiveProxy Basic Auth username (usually email)
+  email?: string; // convenient alias for NaiveProxy subscription inputs
+  password?: string; // trojan / ss / NaiveProxy password
   method?: string; // ss cipher
   flow?: string; // vless
   encryption?: string; // vless server encryption, default 'none'
@@ -41,6 +43,7 @@ export interface SubClient {
   network?: Network;
   security?: Security;
   sni?: string;
+  allowInsecure?: boolean;
   fingerprint?: string;
   path?: string;
   host?: string;
@@ -122,6 +125,16 @@ function shareLink(c: SubClient): string {
         port: c.port,
         name: c.remark,
       });
+    case 'naive+https':
+      return buildNaive({
+        username: c.username ?? c.email ?? c.id ?? '',
+        password: c.password ?? '',
+        address: c.address,
+        port: c.port,
+        name: c.remark,
+        sni: c.sni,
+        allowInsecure: c.allowInsecure,
+      });
   }
 }
 
@@ -197,7 +210,7 @@ function proxyOutbound(c: SubClient): Record<string, unknown> {
     shortId: c.shortId,
   });
 
-  let settings: Record<string, unknown>;
+  let settings: Record<string, unknown> = {};
   switch (c.protocol) {
     case 'vless': {
       const s: Record<string, unknown> = {
@@ -238,6 +251,8 @@ function proxyOutbound(c: SubClient): Record<string, unknown> {
         ],
       };
       break;
+    case 'naive+https':
+      throw new Error('NaiveProxy uses a native JSON document, not an Xray outbound.');
   }
 
   return {
@@ -250,7 +265,23 @@ function proxyOutbound(c: SubClient): Record<string, unknown> {
 
 // Mirrors the one-document-per-client model only; the panel also emits
 // balancer documents (sub_balancers) that are intentionally out of scope here.
+function naiveClientConfig(c: SubClient): Record<string, string> {
+  const link = buildNaive({
+    username: c.username ?? c.email ?? c.id ?? '',
+    password: c.password ?? '',
+    address: c.address,
+    port: c.port,
+    sni: c.sni,
+    allowInsecure: c.allowInsecure,
+  });
+  return {
+    listen: 'socks://127.0.0.1:1080',
+    proxy: link.replace('naive+https:', 'https:').replace(/#.*$/, ''),
+  };
+}
+
 function jsonConfig(c: SubClient): Record<string, unknown> {
+  if (c.protocol === 'naive+https') return naiveClientConfig(c);
   return {
     remarks: c.remark,
     ...subJsonSkeleton(),

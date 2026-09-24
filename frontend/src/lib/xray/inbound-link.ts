@@ -37,6 +37,14 @@ function formatUrlHost(address: string): string {
   return bare.includes(':') ? `[${bare}]` : bare;
 }
 
+function safeUrl(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
 // xHTTP headers ship as Record<string, string> on the wire (Zod schema)
 // rather than the legacy class's HeaderEntry[]. Lookup by case-folded key.
 function xhttpHostFallback(xhttp: XHttpStreamSettings | undefined): string {
@@ -488,9 +496,10 @@ export function genVlessLink(input: GenVlessLinkInput): string {
     params.set('flow', flow);
   }
 
-  const url = new URL(
+  const url = safeUrl(
     `vless://${applyVlessRoute(clientId, externalProxy?.vlessRoute)}@${formatUrlHost(address)}:${port}`,
   );
+  if (!url) return '';
   for (const [key, value] of params) url.searchParams.set(key, value);
   url.hash = encodeURIComponent(remark);
   return url.toString();
@@ -628,9 +637,10 @@ export function genTrojanLink(input: GenTrojanLinkInput): string {
     params.set('security', 'none');
   }
 
-  const url = new URL(
+  const url = safeUrl(
     `trojan://${encodeURIComponent(clientPassword)}@${formatUrlHost(address)}:${port}`,
   );
+  if (!url) return '';
   for (const [key, value] of params) url.searchParams.set(key, value);
   url.hash = encodeURIComponent(remark);
   return url.toString();
@@ -714,7 +724,8 @@ export function genShadowsocksLink(input: GenShadowsocksLinkInput): string {
 
   // SIP002 userinfo is base64(method:pw).
   const userinfo = Base64.encode(`${settings.method}:${passwords.join(':')}`, true);
-  const url = new URL(`ss://${userinfo}@${formatUrlHost(address)}:${port}`);
+  const url = safeUrl(`ss://${userinfo}@${formatUrlHost(address)}:${port}`);
+  if (!url) return '';
   for (const [key, value] of params) url.searchParams.set(key, value);
   url.hash = encodeURIComponent(remark);
   return url.toString();
@@ -834,7 +845,8 @@ export function genHysteriaLink(input: GenHysteriaLinkInput): string {
     params.set('mport', hopPorts);
   }
 
-  const url = new URL(`${scheme}://${clientAuth}@${formatUrlHost(address)}:${port}`);
+  const url = safeUrl(`${scheme}://${clientAuth}@${formatUrlHost(address)}:${port}`);
+  if (!url) return '';
   for (const [key, value] of params) url.searchParams.set(key, value);
   url.hash = encodeURIComponent(remark);
   return url.toString();
@@ -856,11 +868,65 @@ export function genMtprotoLink(input: GenMtprotoLinkInput): string {
   const { inbound, address, port = inbound.port, clientSecret = '' } = input;
   if (inbound.protocol !== 'mtproto') return '';
   if (clientSecret.length === 0) return '';
-  const url = new URL('tg://proxy');
+  const url = safeUrl('tg://proxy');
+  if (!url) return '';
   url.searchParams.set('server', address);
   url.searchParams.set('port', String(port));
   url.searchParams.set('secret', clientSecret);
   return url.toString();
+}
+
+export interface GenNaiveLinkInput {
+  inbound: Inbound;
+  address: string;
+  port?: number;
+  remark?: string;
+  clientEmail: string;
+  clientPassword: string;
+  externalProxy?: ExternalProxyEntry | null;
+}
+
+export function genNaiveLink(input: GenNaiveLinkInput): string {
+  const {
+    inbound,
+    address,
+    port = inbound.port,
+    remark = '',
+    clientEmail,
+    clientPassword,
+    externalProxy = null,
+  } = input;
+  if (inbound.protocol !== 'naive' || !clientEmail || !clientPassword) return '';
+
+  const domain = inbound.settings.domain.trim();
+  const host = formatUrlHost(externalProxy?.dest || domain || address);
+  const targetPort = externalProxy?.port || port;
+  const url = safeUrl(`naive+https://${host}:${targetPort}`);
+  if (!url) return '';
+  url.username = clientEmail;
+  url.password = clientPassword;
+  if (externalProxy?.allowInsecure) url.searchParams.set('allow_insecure', '1');
+  if (externalProxy?.sni) url.searchParams.set('sni', externalProxy.sni);
+  if (remark) url.hash = remark;
+  return url.toString();
+}
+
+export function genNaiveClientConfig(link: string): string {
+  try {
+    const url = new URL(link);
+    if (url.protocol !== 'naive+https:' || !url.username || !url.password || !url.host) return '';
+    const proxy = `https://${url.username}:${url.password}@${url.host}${url.search}`;
+    return JSON.stringify(
+      {
+        listen: 'socks://127.0.0.1:1080',
+        proxy,
+      },
+      null,
+      2,
+    );
+  } catch {
+    return '';
+  }
 }
 
 export interface GenTuicLinkInput {
@@ -890,9 +956,10 @@ export function genTuicLink(input: GenTuicLinkInput): string {
   const host = formatUrlHost(externalProxy?.dest || address);
   const targetPort = externalProxy?.port || port;
 
-  const url = new URL(
+  const url = safeUrl(
     `tuic://${encodeURIComponent(clientUuid)}:${encodeURIComponent(clientPassword)}@${host}:${targetPort}`,
   );
+  if (!url) return '';
   const cc =
     (server.congestion_control as string) || (rawSettings.congestion_control as string) || 'bbr';
   url.searchParams.set('congestion_control', cc);
@@ -945,7 +1012,8 @@ export function genWireguardLink(input: GenWireguardLinkInput): string {
   const peer = settings.peers[peerIndex];
   if (!peer) return '';
 
-  const url = new URL(`wireguard://${formatUrlHost(address)}:${port}`);
+  const url = safeUrl(`wireguard://${formatUrlHost(address)}:${port}`);
+  if (!url) return '';
   url.username = peer.privateKey ?? '';
 
   const pubKey =
@@ -1400,6 +1468,8 @@ export function getInboundClients(inbound: Inbound): ClientShape[] | null {
       return (inbound.settings.clients ?? []) as ClientShape[];
     case 'tuic':
       return (inbound.settings.clients ?? []) as ClientShape[];
+    case 'naive':
+      return (inbound.settings.clients ?? []) as ClientShape[];
     case 'shadowsocks': {
       const isMultiUser = inbound.settings.method !== '2022-blake3-chacha20-poly1305';
       return isMultiUser ? ((inbound.settings.clients ?? []) as ClientShape[]) : null;
@@ -1498,6 +1568,16 @@ export function genLink(input: GenLinkInput): string {
         port,
         remark,
         clientUuid: client.uuid ?? client.id ?? '',
+        clientPassword: client.password ?? '',
+        externalProxy,
+      });
+    case 'naive':
+      return genNaiveLink({
+        inbound,
+        address,
+        port,
+        remark,
+        clientEmail: client.email ?? '',
         clientPassword: client.password ?? '',
         externalProxy,
       });

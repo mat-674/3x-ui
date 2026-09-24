@@ -78,6 +78,42 @@ describe('buildShareLinks', () => {
   });
 });
 
+const naiveClient: SubClient = {
+  protocol: 'naive+https',
+  remark: 'Naive-01',
+  address: 'naive.example.com',
+  port: 443,
+  username: 'alice@example.com',
+  password: 'p@ss',
+};
+
+it('builds a native NaiveProxy link with the client credentials', () => {
+  const [link] = buildShareLinks([naiveClient]);
+  const parsed = parseLink(link);
+  expect(parsed.protocol).toBe('naive+https');
+  expect(parsed.address).toBe('naive.example.com');
+  expect(parsed.port).toBe(443);
+  expect(parsed.credential).toBe('alice@example.com');
+  expect(parsed.name).toBe('Naive-01');
+});
+
+it('preserves Naive endpoint metadata in native JSON', () => {
+  const cfg = JSON.parse(
+    buildJsonSubscription([
+      {
+        ...naiveClient,
+        address: 'edge.example.com',
+        port: 9443,
+        sni: 'origin.example.com',
+        allowInsecure: true,
+      },
+    ]),
+  );
+  expect(cfg.proxy).toBe(
+    'https://alice%40example.com:p%40ss@edge.example.com:9443?allow_insecure=1&sni=origin.example.com',
+  );
+});
+
 describe('buildBase64Subscription', () => {
   it('decodes back to the newline-joined links', () => {
     const trojan: SubClient = {
@@ -162,6 +198,15 @@ describe('buildJsonSubscription', () => {
     const cfg = JSON.parse(buildJsonSubscription([ss]));
     expect(cfg.outbounds[0].protocol).toBe('shadowsocks');
     expect(cfg.outbounds[0].settings.servers[0].method).toBe('aes-256-gcm');
+  });
+
+  it('emits native NaiveProxy JSON without an Xray outbound', () => {
+    const cfg = JSON.parse(buildJsonSubscription([naiveClient]));
+    expect(cfg).toEqual({
+      listen: 'socks://127.0.0.1:1080',
+      proxy: 'https://alice%40example.com:p%40ss@naive.example.com:443',
+    });
+    expect('outbounds' in cfg).toBe(false);
   });
 
   it('emits an array for multiple clients', () => {

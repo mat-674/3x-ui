@@ -3,7 +3,7 @@
 
 import { base64ToText, textToBase64 } from './base64';
 
-export type Protocol = 'vless' | 'vmess' | 'trojan' | 'ss';
+export type Protocol = 'vless' | 'vmess' | 'trojan' | 'ss' | 'naive+https';
 
 export interface ParsedLink {
   protocol: Protocol;
@@ -19,7 +19,13 @@ export interface ParsedLink {
 
 export function detectProtocol(link: string): Protocol | null {
   const scheme = link.trim().slice(0, link.indexOf('://')).toLowerCase();
-  if (scheme === 'vless' || scheme === 'vmess' || scheme === 'trojan' || scheme === 'ss') {
+  if (
+    scheme === 'vless' ||
+    scheme === 'vmess' ||
+    scheme === 'trojan' ||
+    scheme === 'ss' ||
+    scheme === 'naive+https'
+  ) {
     return scheme;
   }
   return null;
@@ -31,6 +37,7 @@ export function parseLink(link: string): ParsedLink {
   switch (protocol) {
     case 'vless':
     case 'trojan':
+    case 'naive+https':
       return parseUserinfoLink(trimmed, protocol);
     case 'vmess':
       return parseVmess(trimmed);
@@ -38,14 +45,19 @@ export function parseLink(link: string): ParsedLink {
       return parseShadowsocks(trimmed);
     default:
       throw new Error(
-        `Unsupported or invalid link. Expected vless://, vmess://, trojan://, or ss://`,
+        `Unsupported or invalid link. Expected vless://, vmess://, trojan://, ss://, or naive+https://`,
       );
   }
 }
 
 // vless:// and trojan:// share the `cred@host:port?params#name` structure.
-function parseUserinfoLink(link: string, protocol: 'vless' | 'trojan'): ParsedLink {
-  const url = new URL(link);
+function parseUserinfoLink(link: string, protocol: 'vless' | 'trojan' | 'naive+https'): ParsedLink {
+  let url: URL;
+  try {
+    url = new URL(link);
+  } catch {
+    throw new Error('Invalid link: malformed URL.');
+  }
   const params: Record<string, string> = {};
   url.searchParams.forEach((value, key) => {
     params[key] = value;
@@ -146,7 +158,30 @@ export function buildTrojan(input: VlessTrojanInput): string {
   return buildUserinfoLink('trojan', input);
 }
 
-function buildUserinfoLink(scheme: 'vless' | 'trojan', input: VlessTrojanInput): string {
+export interface NaiveInput {
+  username: string;
+  password: string;
+  address: string;
+  port: number;
+  name?: string;
+  sni?: string;
+  allowInsecure?: boolean;
+}
+
+export function buildNaive(input: NaiveInput): string {
+  const host = input.address.includes(':') ? `[${input.address}]` : input.address;
+  const query = new URLSearchParams();
+  if (input.allowInsecure) query.set('allow_insecure', '1');
+  if (input.sni) query.set('sni', input.sni);
+  const search = query.toString();
+  const fragment = input.name ? `#${encodeURIComponent(input.name)}` : '';
+  return `naive+https://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${host}:${input.port}${search ? `?${search}` : ''}${fragment}`;
+}
+
+function buildUserinfoLink(
+  scheme: 'vless' | 'trojan' | 'naive+https',
+  input: VlessTrojanInput,
+): string {
   const search = new URLSearchParams(
     Object.entries(input.params ?? {}).filter(([, v]) => v !== '' && v != null),
   ).toString();

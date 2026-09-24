@@ -14,21 +14,22 @@ import { ToolFrame } from './tool-frame';
 import { TextField, SelectField, CheckboxField } from './shared/fields';
 import { OutputBlock } from './shared/output-block';
 
-type ClientProtocol = 'vless' | 'vmess' | 'trojan' | 'ss';
+type ClientProtocol = 'vless' | 'vmess' | 'trojan' | 'ss' | 'naive+https';
 
 interface ClientRow {
   protocol: ClientProtocol;
   remark: string;
   address: string;
   port: string;
-  credential: string; // id (vless/vmess) or password (trojan/ss)
+  credential: string; // id (vless/vmess), password, or NaiveProxy username
+  password: string; // NaiveProxy password
   method: string; // ss
   network: Network;
   security: Security;
   sni: string;
 }
 
-const PROTOCOLS: readonly ClientProtocol[] = ['vless', 'vmess', 'trojan', 'ss'];
+const PROTOCOLS: readonly ClientProtocol[] = ['vless', 'vmess', 'trojan', 'ss', 'naive+https'];
 const NETWORKS: readonly Network[] = ['tcp', 'kcp', 'ws', 'grpc', 'httpupgrade', 'xhttp'];
 const SECURITIES: readonly Security[] = ['none', 'tls', 'reality'];
 
@@ -42,6 +43,7 @@ const DEFAULT_CLIENTS: ClientRow[] = [
     address: 'a.example.com',
     port: '443',
     credential: '11111111-2222-3333-4444-555555555555',
+    password: '',
     method: '',
     network: 'tcp',
     security: 'reality',
@@ -51,13 +53,15 @@ const DEFAULT_CLIENTS: ClientRow[] = [
 
 function toClient(r: ClientRow): SubClient {
   const isUuid = r.protocol === 'vless' || r.protocol === 'vmess';
+  const isNaive = r.protocol === 'naive+https';
   return {
     protocol: r.protocol,
     remark: r.remark,
     address: r.address,
     port: Number(r.port),
     id: isUuid ? r.credential : undefined,
-    password: isUuid ? undefined : r.credential,
+    username: isNaive ? r.credential : undefined,
+    password: isNaive ? r.password : isUuid ? undefined : r.credential,
     method: r.protocol === 'ss' ? r.method : undefined,
     network: r.network,
     security: r.security,
@@ -146,6 +150,7 @@ export function SubscriptionBuilder() {
                 address: '',
                 port: '443',
                 credential: '',
+                password: '',
                 method: '',
                 network: 'tcp',
                 security: 'reality',
@@ -184,10 +189,23 @@ export function SubscriptionBuilder() {
                 inputMode="numeric"
               />
               <TextField
-                label={c.protocol === 'vless' || c.protocol === 'vmess' ? 'UUID (id)' : 'Password'}
+                label={
+                  c.protocol === 'naive+https'
+                    ? 'Username / email'
+                    : c.protocol === 'vless' || c.protocol === 'vmess'
+                      ? 'UUID (id)'
+                      : 'Password'
+                }
                 value={c.credential}
                 onChange={(v) => patch(i, { credential: v })}
               />
+              {c.protocol === 'naive+https' ? (
+                <TextField
+                  label="Password"
+                  value={c.password}
+                  onChange={(v) => patch(i, { password: v })}
+                />
+              ) : null}
               {c.protocol === 'ss' ? (
                 <TextField
                   label="Method"
@@ -195,20 +213,24 @@ export function SubscriptionBuilder() {
                   onChange={(v) => patch(i, { method: v })}
                 />
               ) : null}
-              <SelectField
-                label="Transport"
-                value={c.network}
-                onChange={(v) => patch(i, { network: v as Network })}
-                options={NETWORKS}
-              />
-              <SelectField
-                label="Security"
-                value={c.security}
-                onChange={(v) => patch(i, { security: v as Security })}
-                options={SECURITIES}
-              />
-              {c.security !== 'none' ? (
-                <TextField label="SNI" value={c.sni} onChange={(v) => patch(i, { sni: v })} />
+              {c.protocol !== 'naive+https' ? (
+                <>
+                  <SelectField
+                    label="Transport"
+                    value={c.network}
+                    onChange={(v) => patch(i, { network: v as Network })}
+                    options={NETWORKS}
+                  />
+                  <SelectField
+                    label="Security"
+                    value={c.security}
+                    onChange={(v) => patch(i, { security: v as Security })}
+                    options={SECURITIES}
+                  />
+                  {c.security !== 'none' ? (
+                    <TextField label="SNI" value={c.sni} onChange={(v) => patch(i, { sni: v })} />
+                  ) : null}
+                </>
               ) : null}
             </div>
             <div className="mt-2 flex justify-end">

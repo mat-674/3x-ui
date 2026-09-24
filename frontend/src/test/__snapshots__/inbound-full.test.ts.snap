@@ -84,6 +84,59 @@ exports[`InboundSchema (full) fixtures > parses hysteria-tls byte-stably 1`] = `
 }
 `;
 
+exports[`InboundSchema (full) fixtures > parses naive-basic byte-stably 1`] = `
+{
+  "down": 0,
+  "enable": true,
+  "expiryTime": 0,
+  "id": 6,
+  "listen": "0.0.0.0",
+  "port": 8443,
+  "protocol": "naive",
+  "remark": "Naive inbound",
+  "settings": {
+    "clients": [
+      {
+        "comment": "",
+        "email": "alice@example.test",
+        "enable": true,
+        "expiryTime": 0,
+        "limitIp": 0,
+        "password": "naive-secret",
+        "reset": 0,
+        "subId": "",
+        "tgId": 0,
+        "totalGB": 0,
+      },
+    ],
+    "domain": "naive.example.test",
+    "encode": true,
+    "fallbackRoot": "",
+    "hideIp": true,
+    "hideVia": true,
+    "probeResistance": true,
+  },
+  "shareAddr": "",
+  "shareAddrStrategy": "node",
+  "sniffing": {
+    "destOverride": [
+      "http",
+      "tls",
+      "quic",
+      "fakedns",
+    ],
+    "domainsExcluded": [],
+    "enabled": false,
+    "ipsExcluded": [],
+    "metadataOnly": false,
+    "routeOnly": false,
+  },
+  "tag": "naive-basic",
+  "total": 0,
+  "up": 0,
+}
+`;
+
 exports[`InboundSchema (full) fixtures > parses shadowsocks-tcp-2022 byte-stably 1`] = `
 {
   "down": 0,
