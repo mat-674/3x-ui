@@ -10,7 +10,8 @@
 # serial console (owner-only); /etc/motd (world-readable) shows just the access
 # URL + username. Nothing is baked in advance — every instance is unique.
 #
-# Requires the non-interactive install.sh (3x-ui with XUI_NONINTERACTIVE support).
+# Requires the non-interactive install.sh (3x-ui with
+# XUI_NONINTERACTIVE support).
 # Edit the exported XUI_* knobs in /opt/xui-bootstrap.sh below to customise.
 # ---------------------------------------------------------------------------
 
@@ -30,7 +31,8 @@ write_files:
       export XUI_NONINTERACTIVE=1
       # SSL mode: none (plain HTTP, default) | ip | domain
       export XUI_SSL_MODE="${XUI_SSL_MODE:-none}"
-      # Pin credentials instead of random (leave unset for secure random values):
+      # Pin credentials instead of random (leave unset for secure
+      # random values):
       #   export XUI_USERNAME="admin2"
       #   export XUI_PASSWORD="change-me-please"
       #   export XUI_PANEL_PORT="2053"
@@ -44,12 +46,13 @@ write_files:
       #   export XUI_DB_DSN="postgres://user:pass@host:5432/db?sslmode=disable"
       # ------------------------------------------------------------------------
 
-      curl -fsSL https://raw.githubusercontent.com/MHSanaei/3x-ui/main/install.sh | bash
+      install_url="https://raw.githubusercontent.com/mat-674/3x-ui/main/install.sh"
+      curl -fsSL "$install_url" | bash
 
-      # Surface the generated credentials. Full creds (incl. password + API token)
-      # go ONLY to the serial console (/dev/console, owner-only). /etc/motd is
-      # world-readable, so it gets just the access URL + username and a pointer
-      # to the root-only env file.
+      # Surface the generated credentials. Full creds (incl. password + API
+      # token) go ONLY to the serial console (/dev/console, owner-only).
+      # /etc/motd is world-readable, so it gets just the access URL + username
+      # and a pointer to the root-only env file.
       if [ -r /etc/x-ui/install-result.env ]; then
         {
           echo
@@ -75,4 +78,6 @@ write_files:
 runcmd:
   - [bash, /opt/xui-bootstrap.sh]
 
-final_message: "3x-ui installed — full credentials in /etc/x-ui/install-result.env (sudo); /etc/motd shows the URL + username only."
+final_message: >-
+  3x-ui installed — full credentials in /etc/x-ui/install-result.env (sudo);
+  /etc/motd shows the URL + username only.
