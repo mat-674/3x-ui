@@ -120,7 +120,17 @@ jobs:
           if [[ "$GITHUB_REF" != refs/tags/* ]]; then
             LDFLAGS="$LDFLAGS -X github.com/mhsanaei/3x-ui/v3/internal/config.buildCommit=${GITHUB_SHA::8} -X github.com/mhsanaei/3x-ui/v3/internal/config.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           fi
-          go build -buildvcs=true -ldflags "$LDFLAGS" -o xui-release -v .
+          if ! go build -buildvcs=true -ldflags "$LDFLAGS" \
+            -o xui-release -v . 2>&1 |
+            tee "$BUILD_ROOT/go-build.log"; then
+            build_output=$(
+              tail -c 6000 "$BUILD_ROOT/go-build.log" |
+                tr '\n' ' ' |
+                sed 's/%/%25/g; s/\r/%0D/g'
+            )
+            echo "::error title=Go build output::$build_output"
+            exit 1
+          fi
           file xui-release
           ldd xui-release || echo "Static binary confirmed"
 
