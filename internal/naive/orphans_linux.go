@@ -32,6 +32,6 @@ func killOrphanedProcesses() {
 		if len(parts) < 2 || !strings.Contains(filepath.Base(parts[0]), "caddy") || !strings.Contains(parts[1], filepath.Join(config.GetBinFolderPath(), "naive")) {
 			continue
 		}
-		_ = os.Process{Pid: pid}.Kill()
+		_ = (&os.Process{Pid: pid}).Kill()
 	}
 }
