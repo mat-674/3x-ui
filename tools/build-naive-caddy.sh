@@ -39,7 +39,7 @@ find_xcaddy() {
 
 XCADDY=$(find_xcaddy || true)
 if [ -z "$XCADDY" ]; then
-    unset GOOS GOARCH GOARM
+    unset GOOS GOARCH GOARM CGO_ENABLED CC
     go install "github.com/caddyserver/xcaddy/cmd/xcaddy@${XCADDY_VERSION}"
     XCADDY=$(find_xcaddy || true)
 fi
