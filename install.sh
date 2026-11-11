@@ -1751,9 +1751,12 @@ chain_binary_from_release() {
 }
 
 # Builds the panel binary from the chain branch inside Docker and lifts it out
-# of the builder stage, so the host needs no Go, Node or C toolchain.
+# of the builder stage, so the host needs no Go, Node or C toolchain. The
+# Dockerfile is generated here rather than taken from the repo: the released one
+# calls `npm ci` bare, which is a known flake (exit 146 / heap exhaustion) on
+# small hosts, so this version retries it and caps Node's heap.
 chain_binary_from_docker() {
-    local dest="$1" work="$2" src dir image name
+    local dest="$1" work="$2" src df log attempt image name
 
     if ! command -v docker >/dev/null 2>&1; then
         echo -e "${red}No chain build available and Docker is not installed.${plain}" >&2
@@ -1776,21 +1779,60 @@ chain_binary_from_docker() {
     fi
     tar -xzf "${work}/src.tar.gz" -C "${src}" --strip-components=1 || return 1
 
-    image="x-ui-chain-build:$$"
-    name="xui-chain-$$"
-    echo -e "Building the panel binary in Docker (a few minutes) ..."
-    if ! docker build -q -t "${image}" --target builder "${src}" >/dev/null; then
-        echo -e "${red}Docker build failed${plain}" >&2
-        return 1
-    fi
-    docker create --name "${name}" "${image}" >/dev/null || return 1
-    if ! docker cp "${name}:/app/build/x-ui" "${dest}"; then
+    df="${work}/Dockerfile.chain"
+    cat > "${df}" <<'DOCKERFILE'
+FROM node:26-alpine AS frontend
+WORKDIR /src/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+# The heap cap has to be in place before npm ci: that is the step that dies.
+ENV NODE_OPTIONS=--max-old-space-size=2048
+# npm ci is retried: on a small host it can die with exit 146 or an OOM while
+# unpacking, and a second attempt over a warm cache almost always succeeds.
+RUN set -eux; \
+    npm config set fetch-retries 8; \
+    npm config set fetch-retry-mintimeout 20000; \
+    npm config set fetch-retry-maxtimeout 180000; \
+    npm ci --no-audit --no-fund || \
+    npm ci --no-audit --no-fund || \
+    npm install --no-audit --no-fund
+COPY frontend/ ./
+COPY internal/web/translation /src/internal/web/translation
+RUN npm run build
+
+FROM golang:1.27-alpine AS builder
+WORKDIR /app
+RUN apk --no-cache --update add build-base gcc curl unzip
+COPY . .
+COPY --from=frontend /src/internal/web/dist ./internal/web/dist
+ENV CGO_ENABLED=1
+ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+RUN go build -ldflags "-w -s" -o build/x-ui main.go
+DOCKERFILE
+
+    log="${work}/build.log"
+    for attempt in 1 2; do
+        image="x-ui-chain-build:$$-${attempt}"
+        name="xui-chain-$$-${attempt}"
+        echo -e "Building the panel binary in Docker (attempt ${attempt} of 2, a few minutes) ..."
+        if ! docker build -q -f "${df}" -t "${image}" --target builder "${src}" >"${log}" 2>&1; then
+            if [[ ${attempt} -eq 1 ]]; then
+                echo -e "${yellow}First build failed, retrying once ...${plain}" >&2
+                continue
+            fi
+            echo -e "${red}Docker build failed. Last lines:${plain}" >&2
+            tail -n 30 "${log}" >&2 || true
+            return 1
+        fi
+        docker create --name "${name}" "${image}" >/dev/null || return 1
+        if ! docker cp "${name}:/app/build/x-ui" "${dest}"; then
+            docker rm -f "${name}" >/dev/null 2>&1
+            return 1
+        fi
         docker rm -f "${name}" >/dev/null 2>&1
-        return 1
-    fi
-    docker rm -f "${name}" >/dev/null 2>&1
-    docker rmi "${image}" >/dev/null 2>&1 || true
-    return 0
+        docker rmi "${image}" >/dev/null 2>&1 || true
+        return 0
+    done
+    return 1
 }
 
 # Puts the chain build in place of the release binary. Sources, in order: a
