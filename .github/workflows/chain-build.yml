@@ -1,0 +1,127 @@
+name: Chain build (panel binary)
+
+# Publishes the bare `x-ui-linux-<arch>` asset that install.sh downloads for the
+# drop-in chain installer. Kept separate from release.yml on purpose: that
+# workflow ships .tar.gz archives under version tags, while the installer expects
+# an unpacked binary under one moving tag, so the two cannot share a job.
+#
+# Manual only: re-running republishes the asset in place with --clobber, and a
+# pinned version silently changing underneath someone is worse than a stale build.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build (branch, tag or commit)
+        required: true
+        default: feat/sub-client-proxy-chains
+      tag:
+        description: Release tag to publish the binary under
+        required: true
+        default: chain-build
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - amd64
+          - arm64
+    steps:
+      - name: Checkout the requested ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      # The frontend bundle must exist before `go build`: //go:embed all:dist in
+      # internal/web/web.go fails on a fresh checkout without it.
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend bundle
+        run: |
+          npm ci
+          npm run build
+        working-directory: frontend
+
+      # CGO is mandatory: the SQLite driver is cgo-only, so a CGO_ENABLED=0
+      # binary builds fine and then dies the first time it touches the database.
+      - name: Install the C toolchain for ${{ matrix.platform }}
+        run: |
+          set -eux
+          sudo apt-get update
+          case "${{ matrix.platform }}" in
+            amd64) sudo apt-get install -y --no-install-recommends gcc libc6-dev ;;
+            arm64) sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu ;;
+            *) echo "unsupported platform ${{ matrix.platform }}"; exit 1 ;;
+          esac
+
+      - name: Build x-ui for ${{ matrix.platform }}
+        run: |
+          set -eux
+          case "${{ matrix.platform }}" in
+            amd64) export CC=gcc ;;
+            arm64) export CC=aarch64-linux-gnu-gcc ;;
+          esac
+          export CGO_ENABLED=1
+          export GOOS=linux
+          export GOARCH=${{ matrix.platform }}
+          # Stamping the commit is what makes the panel report "dev+<commit>", so
+          # an installed panel says exactly which build is running — the whole
+          # point of a rolling binary. -w -s only: the published asset is
+          # glibc-linked, not static musl.
+          LDFLAGS="-w -s"
+          LDFLAGS="$LDFLAGS -X github.com/mhsanaei/3x-ui/v3/internal/config.buildCommit=${GITHUB_SHA::8}"
+          LDFLAGS="$LDFLAGS -X github.com/mhsanaei/3x-ui/v3/internal/config.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p dist-bin
+          go build -ldflags "$LDFLAGS" -o "dist-bin/x-ui-linux-${{ matrix.platform }}" -v .
+          file "dist-bin/x-ui-linux-${{ matrix.platform }}"
+
+      # A binary that cannot print its own version is worse than no build at all,
+      # and the amd64 runner can actually execute its own output.
+      - name: Smoke-test the binary
+        if: matrix.platform == 'amd64'
+        run: |
+          set -eux
+          chmod +x "dist-bin/x-ui-linux-${{ matrix.platform }}"
+          ./dist-bin/x-ui-linux-${{ matrix.platform }} -v
+
+      # The installer verifies <asset>.sha256 next to the binary and aborts the
+      # whole install on a mismatch, so both files must land in the same release.
+      - name: Checksum
+        run: |
+          set -eux
+          cd dist-bin
+          sha256sum "x-ui-linux-${{ matrix.platform }}" > "x-ui-linux-${{ matrix.platform }}.sha256"
+          cat "x-ui-linux-${{ matrix.platform }}.sha256"
+
+      - name: Publish to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -eux
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "Chain build" \
+            --notes "Rolling panel binary for the drop-in installer. Rebuilt on demand; the source ref and commit are recorded in the workflow run."
+          gh release upload "$TAG" \
+            "dist-bin/x-ui-linux-${{ matrix.platform }}" \
+            "dist-bin/x-ui-linux-${{ matrix.platform }}.sha256" \
+            --clobber
+
+      - name: Report
+        run: echo "Published x-ui-linux-${{ matrix.platform }} to tag ${{ inputs.tag }} from ${{ inputs.ref }} (${GITHUB_SHA::8})"
