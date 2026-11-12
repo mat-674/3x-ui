@@ -1895,6 +1895,7 @@ ssl_cert_issue() {
     if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
         echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; x-ui restart"
         echo -e "${green}\t2.${plain} Input your own command"
+        echo -e "${green}\t3.${plain} Preset: systemctl reload nginx ; x-ui edge apply ; x-ui restart"
         echo -e "${green}\t0.${plain} Keep default reloadcmd"
         read -rp "Choose an option: " choice
         case "$choice" in
@@ -1906,6 +1907,10 @@ ssl_cert_issue() {
                 LOGD "It's recommended to put x-ui restart at the end, so it won't raise an error if other services fails"
                 read -rp "Please enter your reloadcmd (example: systemctl reload nginx ; x-ui restart): " reloadCmd
                 LOGI "Your reloadcmd is: ${reloadCmd}"
+                ;;
+            3)
+                LOGI "Reloadcmd is: systemctl reload nginx ; x-ui edge apply ; x-ui restart"
+                reloadCmd="systemctl reload nginx ; x-ui edge apply ; x-ui restart"
                 ;;
             *)
                 LOGI "Keep default reloadcmd"
@@ -2060,6 +2065,7 @@ ssl_cert_issue_CF() {
         if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
             echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; x-ui restart"
             echo -e "${green}\t2.${plain} Input your own command"
+            echo -e "${green}\t3.${plain} Preset: systemctl reload nginx ; x-ui edge apply ; x-ui restart"
             echo -e "${green}\t0.${plain} Keep default reloadcmd"
             read -rp "Choose an option: " choice
             case "$choice" in
@@ -2071,6 +2077,10 @@ ssl_cert_issue_CF() {
                     LOGD "It's recommended to put x-ui restart at the end, so it won't raise an error if other services fails"
                     read -rp "Please enter your reloadcmd (example: systemctl reload nginx ; x-ui restart): " reloadCmd
                     LOGI "Your reloadcmd is: ${reloadCmd}"
+                    ;;
+                3)
+                    LOGI "Reloadcmd is: systemctl reload nginx ; x-ui edge apply ; x-ui restart"
+                    reloadCmd="systemctl reload nginx ; x-ui edge apply ; x-ui restart"
                     ;;
                 *)
                     LOGI "Keep default reloadcmd"
@@ -3475,6 +3485,171 @@ migrate_db_prompt() {
     migrate_db "$input" "$output"
 }
 
+# The panel keeps its own nginx instance for Xray's REALITY fallback: its config,
+# pid file and logs live in <db folder>/edge. These helpers expose that instance
+# to the shell through the same `x-ui edge` subcommands the panel drives itself.
+nginx_edge_db_folder() {
+    local folder="${XUI_DB_FOLDER:-}"
+    local env_file=""
+    if [[ -z "${folder}" ]]; then
+        env_file="$(xui_env_file_path)"
+        if [[ -r "${env_file}" ]]; then
+            folder="$(sed -n \
+                -e 's/^[[:space:]]*export[[:space:]]\{1,\}XUI_DB_FOLDER=//p' \
+                -e 's/^[[:space:]]*XUI_DB_FOLDER=//p' \
+                "${env_file}" 2> /dev/null | tail -n 1)"
+            # The env file may carry the value quoted and/or padded; trim both ends
+            # before and after unquoting, so `X=/d` and `X=" /d "` both work.
+            folder="${folder#"${folder%%[![:space:]]*}"}"
+            folder="${folder%"${folder##*[![:space:]]}"}"
+            folder="${folder%\"}"
+            folder="${folder#\"}"
+            folder="${folder%\'}"
+            folder="${folder#\'}"
+            folder="${folder#"${folder%%[![:space:]]*}"}"
+            folder="${folder%"${folder##*[![:space:]]}"}"
+        fi
+    fi
+    [[ -n "${folder}" ]] || folder="/etc/x-ui"
+    # The panel resolves a relative XUI_DB_FOLDER against its own folder.
+    [[ "${folder}" == /* ]] || folder="${xui_folder}/${folder}"
+    printf '%s\n' "${folder}"
+}
+
+# Installs the nginx binary the perimeter runs on, mirroring install.sh's distro
+# mapping. Idempotent, and never reconfigures an nginx the operator already had.
+install_nginx() {
+    if command -v nginx > /dev/null 2>&1; then
+        LOGI "nginx is already installed: $(nginx -v 2>&1)"
+        LOGI "The panel runs its own nginx instance on its configured port, next to this one."
+        return 0
+    fi
+    if [[ "${running_in_docker}" == "true" ]]; then
+        LOGE "The panel runs in a container: nginx has to come from the image, not from this menu."
+        return 1
+    fi
+    if ! confirm "Install nginx for the REALITY fallback (decoy site)?" "n"; then
+        LOGI "Nginx installation skipped."
+        return 0
+    fi
+
+    case "${release}" in
+        ubuntu | debian | armbian)
+            apt-get update && apt-get install -y -q nginx
+            ;;
+        fedora | amzn | virtuozzo | rhel | almalinux | rocky | ol)
+            dnf makecache -y && dnf install -y -q nginx
+            ;;
+        centos)
+            if [[ "${VERSION_ID}" =~ ^7 ]]; then
+                yum install -y nginx
+            else
+                dnf install -y -q nginx
+            fi
+            ;;
+        arch | manjaro | parch)
+            pacman -Sy --noconfirm nginx
+            ;;
+        opensuse-tumbleweed | opensuse-leap)
+            zypper refresh && zypper -q install -y nginx
+            ;;
+        alpine)
+            apk update && apk add --no-cache nginx
+            ;;
+        *)
+            apt-get update && apt-get install -y -q nginx
+            ;;
+    esac
+
+    # The packaged service starts with the stock default site, which would hold
+    # port 80. The panel serves the decoy from its own config, so stop it instead.
+    if command -v systemctl > /dev/null 2>&1 && systemctl --version > /dev/null 2>&1; then
+        systemctl disable --now nginx > /dev/null 2>&1 || true
+    elif command -v rc-service > /dev/null 2>&1; then
+        rc-service nginx stop > /dev/null 2>&1 || true
+        command -v rc-update > /dev/null 2>&1 && rc-update del nginx default > /dev/null 2>&1
+    elif command -v service > /dev/null 2>&1; then
+        service nginx stop > /dev/null 2>&1 || true
+    fi
+
+    if ! nginx -v > /dev/null 2>&1; then
+        LOGE "nginx is still missing after the install attempt; the REALITY fallback cannot run without it."
+        return 1
+    fi
+    LOGI "nginx installed: $(nginx -v 2>&1)"
+    LOGI "Packaged nginx default site disabled; the panel starts its own instance from its own config."
+    return 0
+}
+
+before_nginx_edge_menu() {
+    echo && echo -n -e "${yellow}Press enter to return to the Nginx Perimeter menu: ${plain}" && read -r temp
+    nginx_edge_menu
+}
+
+nginx_edge_menu() {
+    local edge_folder edge_log
+    edge_folder="$(nginx_edge_db_folder)"
+    edge_log="${edge_folder}/edge/logs/error.log"
+
+    echo -e "${green}\t1.${plain} ${green}Install${plain} nginx"
+    echo -e "${green}\t2.${plain} Status"
+    echo -e "${green}\t3.${plain} ${green}Apply${plain} configuration"
+    echo -e "${green}\t4.${plain} Show generated config (${edge_folder}/edge/nginx.conf)"
+    echo -e "${green}\t5.${plain} Show nginx error log"
+    echo -e "${green}\t6.${plain} Back to Main Menu"
+    read -rp "Choose an option: " choice
+    case "$choice" in
+        0 | 6)
+            show_menu
+            ;;
+        1)
+            install_nginx
+            before_nginx_edge_menu
+            ;;
+        2)
+            if check_install 0; then
+                # A missing binary is the usual reason the perimeter never came
+                # up, so name it here instead of only reporting it not running.
+                if command -v nginx > /dev/null 2>&1; then
+                    LOGI "nginx: $(nginx -v 2>&1)"
+                else
+                    LOGE "nginx is not installed; choose option 1 before applying the perimeter."
+                fi
+                "${xui_folder}/x-ui" edge status
+            fi
+            before_nginx_edge_menu
+            ;;
+        3)
+            if check_install 0; then
+                "${xui_folder}/x-ui" edge apply
+            fi
+            before_nginx_edge_menu
+            ;;
+        4)
+            if check_install 0; then
+                if command -v less > /dev/null 2>&1; then
+                    "${xui_folder}/x-ui" edge config | less -R
+                else
+                    "${xui_folder}/x-ui" edge config
+                fi
+            fi
+            before_nginx_edge_menu
+            ;;
+        5)
+            if [[ -r "${edge_log}" ]]; then
+                tail -n 50 "${edge_log}"
+            else
+                LOGE "No nginx error log at ${edge_log} yet; apply the perimeter first (option 3)."
+            fi
+            before_nginx_edge_menu
+            ;;
+        *)
+            echo -e "${red}Invalid option. Please select a valid number.${plain}\n"
+            nginx_edge_menu
+            ;;
+    esac
+}
+
 show_usage() {
     echo -e "┌────────────────────────────────────────────────────────────────┐
 │  ${blue}x-ui control menu usages (subcommands):${plain}                       │
@@ -3495,6 +3670,7 @@ show_usage() {
 │  ${blue}x-ui update-all-geofiles${plain}   - Update all geo files             │
 │  ${blue}x-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
 │  ${blue}x-ui pgclient [ver]${plain}        - Upgrade pg_dump/pg_restore tools │
+│  ${blue}x-ui edge [action]${plain}         - Nginx REALITY fallback perimeter │
 │  ${blue}x-ui legacy${plain}                - Legacy version                   │
 │  ${blue}x-ui install${plain}               - Install                          │
 │  ${blue}x-ui uninstall${plain}             - Uninstall                        │
@@ -3540,10 +3716,11 @@ show_menu() {
 │  ${green}26.${plain} Enable BBR                               │
 │  ${green}27.${plain} Update Geo Files                         │
 │  ${green}28.${plain} Speedtest by Ookla                       │
+│  ${green}29.${plain} Nginx Perimeter (REALITY fallback)       │
 ╚────────────────────────────────────────────────╝
 "
     show_status
-    echo && read -rp "Please enter your selection [0-28]: " num
+    echo && read -rp "Please enter your selection [0-29]: " num
 
     case "${num}" in
         0)
@@ -3633,8 +3810,11 @@ show_menu() {
         28)
             run_speedtest
             ;;
+        29)
+            nginx_edge_menu
+            ;;
         *)
-            LOGE "Please enter the correct number [0-28]"
+            LOGE "Please enter the correct number [0-29]"
             ;;
     esac
 }
@@ -3700,6 +3880,11 @@ if [[ $# -gt 0 ]]; then
             ;;
         "pgclient")
             pg_upgrade_client "$2"
+            ;;
+        # The perimeter lives in the panel binary; forward so `x-ui edge ...`
+        # works from a shell and from acme.sh --reloadcmd hooks.
+        "edge")
+            check_install 0 && "${xui_folder}/x-ui" edge "${@:2}"
             ;;
         *) show_usage ;;
     esac

@@ -853,6 +853,7 @@ ssl_cert_issue() {
     if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
         echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; systemctl restart x-ui"
         echo -e "${green}\t2.${plain} Input your own command"
+        echo -e "${green}\t3.${plain} Preset: systemctl reload nginx ; x-ui edge apply ; x-ui restart"
         echo -e "${green}\t0.${plain} Keep default reloadcmd"
         read -rp "Choose an option: " choice
         case "$choice" in
@@ -864,6 +865,10 @@ ssl_cert_issue() {
                 echo -e "${yellow}It's recommended to put x-ui restart at the end${plain}"
                 read -rp "Please enter your custom reloadcmd: " reloadCmd
                 echo -e "${green}Reloadcmd is: ${reloadCmd}${plain}"
+                ;;
+            3)
+                echo -e "${green}Reloadcmd is: systemctl reload nginx ; x-ui edge apply ; x-ui restart${plain}"
+                reloadCmd="systemctl reload nginx ; x-ui edge apply ; x-ui restart"
                 ;;
             *)
                 echo -e "${green}Keeping default reloadcmd${plain}"
@@ -1524,6 +1529,97 @@ setup_fail2ban() {
     else
         echo -e "${yellow}Fail2ban setup did not finish; IP Limit stays disabled until you run 'x-ui' and open the IP Limit menu. Continuing.${plain}"
     fi
+    return 0
+}
+
+# install_nginx installs the nginx binary that serves the REALITY decoy perimeter.
+# The panel runs its own instance from <db folder>/edge/nginx.conf with its own
+# pid, logs and temp dirs, so nothing here writes to /etc/nginx. Nginx is
+# optional and a failure here must never abort the panel install.
+install_nginx() {
+    local confirm=""
+
+    # An nginx that is already present belongs to the operator: never reinstall,
+    # reconfigure or stop it. The panel's instance listens on its own port, so
+    # both run side by side.
+    if command -v nginx > /dev/null 2>&1; then
+        if ! nginx -v > /dev/null 2>&1; then
+            echo -e "${yellow}Found nginx at $(command -v nginx) but 'nginx -v' fails; leaving it untouched. Fix it before enabling the REALITY fallback.${plain}"
+            return 0
+        fi
+        echo -e "${green}nginx is already installed ($(nginx -v 2>&1)); leaving it untouched.${plain}"
+        echo -e "${green}The panel runs its own nginx instance for the REALITY fallback on its configured port, next to this one.${plain}"
+        return 0
+    fi
+
+    if [[ "$NONINTERACTIVE" == "1" ]]; then
+        if [[ "${XUI_ENABLE_NGINX:-}" != "true" ]]; then
+            echo -e "${yellow}Nginx is not installed. The REALITY decoy fallback needs it; install it later from 'x-ui' -> Nginx Perimeter or rerun with XUI_ENABLE_NGINX=true.${plain}"
+            return 0
+        fi
+    else
+        if ! read -rp "Install nginx for the panel's REALITY fallback (decoy site)? (If not, the panel runs without it) [y/N]: " confirm; then
+            echo -e "${yellow}Cannot read the nginx confirmation; skipping nginx.${plain}"
+            return 0
+        fi
+        case "${confirm,,}" in
+            y | yes) ;;
+            *)
+                echo -e "${yellow}Skipping nginx. The REALITY fallback stays unavailable until nginx is installed (option 29 in 'x-ui').${plain}"
+                return 0
+                ;;
+        esac
+    fi
+
+    echo -e "${green}Installing nginx for the REALITY fallback...${plain}"
+    case "${release}" in
+        ubuntu | debian | armbian)
+            apt-get update && apt-get install -y -q nginx
+            ;;
+        fedora | amzn | virtuozzo | rhel | almalinux | rocky | ol)
+            dnf makecache -y && dnf install -y -q nginx
+            ;;
+        centos)
+            if [[ "${VERSION_ID}" =~ ^7 ]]; then
+                yum install -y nginx
+            else
+                dnf install -y -q nginx
+            fi
+            ;;
+        arch | manjaro | parch)
+            pacman -Sy --noconfirm nginx
+            ;;
+        opensuse-tumbleweed | opensuse-leap)
+            zypper refresh && zypper -q install -y nginx
+            ;;
+        alpine)
+            apk update && apk add --no-cache nginx
+            ;;
+        *)
+            apt-get update && apt-get install -y -q nginx
+            ;;
+    esac
+
+    # The distribution package starts and enables its own service with the stock
+    # default site, which would hold port 80 and answer probes with an nginx
+    # banner. The panel serves the decoy from its own config, so stop and disable
+    # the packaged unit instead of leaving two servers to compete for the ports.
+    if command -v systemctl > /dev/null 2>&1 && systemctl --version > /dev/null 2>&1; then
+        systemctl disable --now nginx > /dev/null 2>&1 || true
+    elif command -v rc-service > /dev/null 2>&1; then
+        rc-service nginx stop > /dev/null 2>&1 || true
+        command -v rc-update > /dev/null 2>&1 && rc-update del nginx default > /dev/null 2>&1
+    elif command -v service > /dev/null 2>&1; then
+        service nginx stop > /dev/null 2>&1 || true
+    fi
+
+    if ! nginx -v > /dev/null 2>&1; then
+        echo -e "${red}nginx is still missing after the install attempt; the panel's REALITY fallback cannot run until it is installed.${plain}"
+        return 1
+    fi
+
+    echo -e "${green}nginx installed: $(nginx -v 2>&1)${plain}"
+    echo -e "${green}Packaged nginx default site disabled; the panel starts its own instance from its own generated config.${plain}"
     return 0
 }
 
@@ -2257,6 +2353,12 @@ install_x-ui() {
     # IP Limit relies on fail2ban; install + configure it now so the feature
     # works out of the box (no-op when XUI_ENABLE_FAIL2BAN=false). Never fatal.
     setup_fail2ban
+
+    # The REALITY decoy perimeter needs the nginx binary; optional, so a failed
+    # or declined install only leaves the fallback unavailable. Never fatal.
+    if ! install_nginx; then
+        echo -e "${yellow}Continuing without nginx: the REALITY fallback stays unavailable until it is installed (option 29 in 'x-ui').${plain}"
+    fi
 
     echo -e "${green}x-ui ${tag_version}${plain} installation finished, it is running now..."
     echo -e ""
