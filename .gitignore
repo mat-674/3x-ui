@@ -44,3 +44,6 @@ docker-compose.override.yml
 
 # Ignore .env (Environment Variables) file
 .env
+
+# Local code-intelligence index (codegraph)
+.codegraph/
