@@ -1,12 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Form, Modal, Select, Space } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Divider,
+  Form,
+  Modal,
+  Select,
+  Tag,
+  Tooltip,
+  Typography,
+  message,
+} from 'antd';
 import { DownloadOutlined, SyncOutlined } from '@ant-design/icons';
 
-import { HttpUtil, FileManager, PromiseUtil } from '@/utils';
+import { HttpUtil, FileManager, PromiseUtil, SizeFormatter } from '@/utils';
 import { activateOnKey } from '@/utils/a11y';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { parseLogLine } from './logParse';
+import {
+  LOG_EXPORT_LINES,
+  LOG_SOURCES_KEY,
+  LOG_SOURCE_LABELS,
+  LOG_SOURCE_ORDER,
+  PANEL_LOG_LEVELS,
+  PANEL_LOG_LEVEL_LABELS,
+  downloadLogFile,
+  fetchLogSources,
+  type PanelLogLevel,
+} from './logDiagnostics';
 import './LogModal.css';
 
 interface LogModalProps {
@@ -15,6 +39,10 @@ interface LogModalProps {
 }
 
 const AUTO_UPDATE_INTERVAL = 5000;
+
+function isPanelLogLevel(value: unknown): value is PanelLogLevel {
+  return typeof value === 'string' && (PANEL_LOG_LEVELS as readonly string[]).includes(value);
+}
 
 export default function LogModal({ open, onClose }: LogModalProps) {
   const { t } = useTranslation();
@@ -25,6 +53,16 @@ export default function LogModal({ open, onClose }: LogModalProps) {
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [panelLevel, setPanelLevel] = useState<PanelLogLevel>('info');
+  const [levelSaving, setLevelSaving] = useState(false);
+  const [levelError, setLevelError] = useState('');
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const sourcesQuery = useQuery({
+    queryKey: LOG_SOURCES_KEY,
+    queryFn: fetchLogSources,
+    enabled: open,
+    retry: false,
+  });
 
   const runRefresh = useCallback(async () => {
     try {
@@ -70,7 +108,51 @@ export default function LogModal({ open, onClose }: LogModalProps) {
     return () => clearInterval(id);
   }, [open, autoUpdate]);
 
+  /* No endpoint reports the current level, so the select starts on the backend
+     default and adopts the level the POST answers with — the panel's real one. */
+  async function changePanelLevel(next: PanelLogLevel): Promise<void> {
+    const previous = panelLevel;
+    setLevelError('');
+    setLevelSaving(true);
+    setPanelLevel(next);
+    try {
+      const msg = await HttpUtil.post<{ level?: string }>(
+        '/panel/api/server/logLevel',
+        { level: next },
+        { silent: true, headers: { 'Content-Type': 'application/json' } },
+      );
+      if (!msg.success) {
+        setPanelLevel(previous);
+        setLevelError(msg.msg || t('pages.index.logLevelChangeFailed'));
+        return;
+      }
+      const applied = isPanelLogLevel(msg.obj?.level) ? msg.obj.level : next;
+      setPanelLevel(applied);
+      messageApi.success(
+        t('pages.index.logLevelChanged', { level: t(PANEL_LOG_LEVEL_LABELS[applied]) }),
+      );
+    } catch (error) {
+      setPanelLevel(previous);
+      setLevelError((error as Error).message || t('pages.index.logLevelChangeFailed'));
+    } finally {
+      setLevelSaving(false);
+    }
+  }
+
   const parsedLogs = useMemo(() => logs.map(parseLogLine), [logs]);
+
+  const orderedSources = useMemo(() => {
+    const rank = (name: string) => {
+      const index = (LOG_SOURCE_ORDER as readonly string[]).indexOf(name);
+      return index < 0 ? LOG_SOURCE_ORDER.length : index;
+    };
+    return [...(sourcesQuery.data ?? [])].sort((a, b) => rank(a.name) - rank(b.name));
+  }, [sourcesQuery.data]);
+
+  function sourceLabel(name: string): string {
+    const key = LOG_SOURCE_LABELS[name];
+    return key ? t(key) : name;
+  }
 
   function download() {
     FileManager.downloadTextFile(logs.join('\n'), 'x-ui.log');
@@ -101,38 +183,41 @@ export default function LogModal({ open, onClose }: LogModalProps) {
       onCancel={onClose}
       title={titleNode}
     >
+      {messageContextHolder}
       <Form layout="inline" className="log-toolbar">
-        <Form.Item>
-          <Space.Compact>
-            <Select
-              aria-label={t('pages.index.logLines')}
-              value={rows}
-              size="small"
-              style={{ width: 100 }}
-              onChange={setRows}
-              options={[
-                { value: '20', label: '20' },
-                { value: '50', label: '50' },
-                { value: '100', label: '100' },
-                { value: '500', label: '500' },
-                { value: '1000', label: '1000' },
-              ]}
-            />
-            <Select
-              aria-label={t('pages.xray.logLevel')}
-              value={level}
-              size="small"
-              style={{ minWidth: 95 }}
-              onChange={setLevel}
-              options={[
-                { value: 'debug', label: t('pages.index.logLevelDebug') },
-                { value: 'info', label: t('pages.index.logLevelInfo') },
-                { value: 'notice', label: t('pages.index.logLevelNotice') },
-                { value: 'warning', label: t('pages.index.logLevelWarning') },
-                { value: 'err', label: t('pages.index.logLevelError') },
-              ]}
-            />
-          </Space.Compact>
+        <Form.Item label={t('pages.index.logLines')}>
+          <Select
+            aria-label={t('pages.index.logLines')}
+            value={rows}
+            size="small"
+            style={{ width: 100 }}
+            onChange={setRows}
+            options={[
+              { value: '20', label: '20' },
+              { value: '50', label: '50' },
+              { value: '100', label: '100' },
+              { value: '500', label: '500' },
+              { value: '1000', label: '1000' },
+            ]}
+          />
+        </Form.Item>
+        {/* Two level controls sit side by side, so each carries its own name:
+            one narrows the lines fetched, the other changes the running panel. */}
+        <Form.Item label={t('pages.index.viewLevel')}>
+          <Select
+            aria-label={t('pages.index.viewLevel')}
+            value={level}
+            size="small"
+            style={{ minWidth: 95 }}
+            onChange={setLevel}
+            options={[
+              { value: 'debug', label: t('pages.index.logLevelDebug') },
+              { value: 'info', label: t('pages.index.logLevelInfo') },
+              { value: 'notice', label: t('pages.index.logLevelNotice') },
+              { value: 'warning', label: t('pages.index.logLevelWarning') },
+              { value: 'err', label: t('pages.index.logLevelError') },
+            ]}
+          />
         </Form.Item>
         <Form.Item>
           <Checkbox checked={syslog} onChange={(e) => setSyslog(e.target.checked)}>
@@ -147,10 +232,99 @@ export default function LogModal({ open, onClose }: LogModalProps) {
             type="primary"
             onClick={download}
             icon={<DownloadOutlined aria-hidden />}
-            aria-label={t('download')}
+            aria-label={t('pages.index.saveVisibleLogs')}
           />
         </Form.Item>
       </Form>
+
+      <Form layout="vertical" className="log-level-form">
+        <Form.Item
+          label={t('pages.index.panelLogLevel')}
+          extra={t('pages.index.panelLogLevelHint')}
+        >
+          <Select
+            aria-label={t('pages.index.panelLogLevel')}
+            value={panelLevel}
+            size="small"
+            loading={levelSaving}
+            style={{ maxWidth: 200 }}
+            onChange={(value: PanelLogLevel) => void changePanelLevel(value)}
+            options={PANEL_LOG_LEVELS.map((value) => ({
+              value,
+              label: t(PANEL_LOG_LEVEL_LABELS[value]),
+            }))}
+          />
+        </Form.Item>
+      </Form>
+
+      {levelError && (
+        <div data-testid="log-level-error" className="log-level-error">
+          <Alert
+            type="error"
+            showIcon
+            title={t('pages.index.logLevelChangeFailed')}
+            description={<pre className="log-error-detail">{levelError}</pre>}
+          />
+        </div>
+      )}
+
+      <Divider className="log-sources-divider" />
+
+      <div className="log-sources" data-testid="log-sources">
+        <Typography.Text strong>{t('pages.index.downloadLogs')}</Typography.Text>
+        <Typography.Paragraph type="secondary" className="log-sources-hint">
+          {t('pages.index.downloadLogsHint', { lines: LOG_EXPORT_LINES })}
+        </Typography.Paragraph>
+
+        {sourcesQuery.isError && (
+          <div data-testid="log-sources-error">
+            <Alert type="error" showIcon title={t('pages.index.logSourceLoadFailed')} />
+          </div>
+        )}
+
+        {sourcesQuery.isPending && (
+          <Typography.Text type="secondary">{t('loading')}</Typography.Text>
+        )}
+        {sourcesQuery.isSuccess && orderedSources.length === 0 && (
+          <Typography.Text type="secondary">{t('noData')}</Typography.Text>
+        )}
+
+        {orderedSources.map((source) => (
+          <div
+            className="log-source-row"
+            key={source.name}
+            data-testid={`log-source-${source.name}`}
+          >
+            <div className="log-source-meta">
+              <span className="log-source-name">{sourceLabel(source.name)}</span>
+              <span className="log-source-path">{source.path}</span>
+            </div>
+            {source.exists ? (
+              <span className="log-source-size">{SizeFormatter.sizeFormat(source.size)}</span>
+            ) : (
+              <Tag data-testid={`log-source-missing-${source.name}`}>
+                {t('pages.index.logSourceMissingTag')}
+              </Tag>
+            )}
+            <Tooltip
+              title={source.exists ? undefined : t('pages.index.logSourceMissingHint')}
+              placement="topRight"
+            >
+              <span>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined aria-hidden />}
+                  disabled={!source.exists}
+                  aria-label={t('pages.index.downloadSource', {
+                    source: sourceLabel(source.name),
+                  })}
+                  onClick={() => downloadLogFile(source.name)}
+                />
+              </span>
+            </Tooltip>
+          </div>
+        ))}
+      </div>
 
       <div className={`log-container ${isMobile ? 'log-container-mobile' : ''}`}>
         {parsedLogs.length === 0 ? (

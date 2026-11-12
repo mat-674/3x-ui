@@ -38,6 +38,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/email"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/panel"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/tgbot"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/websocket"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
@@ -127,6 +128,10 @@ type Server struct {
 	discordService *discord.DiscordService
 	discordGateway *discord.GatewayClient
 
+	// edgeEnabled reports that the nginx perimeter owns the public port, so the
+	// panel itself is loopback-only and speaks plain HTTP.
+	edgeEnabled bool
+
 	wsHub *websocket.Hub
 
 	bus                  *eventbus.Bus
@@ -172,7 +177,17 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	}
 
 	engine := gin.Default()
-	directHTTPS := s.isDirectHTTPSConfigured()
+	// Behind the nginx perimeter TLS is terminated outside this process, so the
+	// panel binds loopback and speaks plain HTTP; cookies and HSTS must still
+	// behave as if this were the HTTPS origin.
+	edgeSettings, edgeErr := s.settingService.GetEdgeSettings()
+	if edgeErr != nil {
+		logger.Warning("nginx perimeter settings unreadable, assuming it is off:", edgeErr)
+		edgeSettings = service.EdgeSettings{}
+	}
+	s.edgeEnabled = edgeSettings.Enable
+	directHTTPS := s.isDirectHTTPSConfigured() || s.edgeEnabled
+	session.SetSecureCookies(s.edgeEnabled)
 	sendHSTS := directHTTPS && !config.IsSkipHSTS()
 	engine.Use(middleware.SecurityHeadersMiddleware(sendHSTS))
 
@@ -220,7 +235,12 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		sessionOptions.MaxAge = sessionMaxAge * 60 // minutes -> seconds
 	}
 	store.Options(sessionOptions)
-	engine.Use(sessions.Sessions("3x-ui", store))
+	cookieName, err := s.settingService.GetCookieName()
+	if err != nil {
+		return nil, err
+	}
+	session.SetSessionCookieName(cookieName)
+	engine.Use(sessions.Sessions(session.SessionCookieName(), store))
 	engine.Use(func(c *gin.Context) {
 		c.Set("base_path", basePath)
 	})
@@ -513,6 +533,16 @@ func (s *Server) memoryAlarmWanted() bool {
 	return false
 }
 
+// panelListenAddress is the address the panel's own listener binds. Behind the
+// perimeter a public panel port would be the first thing a scanner finds, and it
+// would sit outside the decoy's 404, so the panel drops to loopback.
+func panelListenAddress(configured string, port int, edgeEnabled bool) string {
+	if edgeEnabled {
+		configured = "127.0.0.1"
+	}
+	return net.JoinHostPort(configured, strconv.Itoa(port))
+}
+
 // Start initializes and starts the web server with configured settings, routes, and background jobs.
 func (s *Server) Start() (err error) {
 	return s.start(true, true)
@@ -577,6 +607,8 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 		return err
 	}
 
+	// Behind the nginx perimeter the panel is reached only through TLS it does not
+	// terminate, so it must bind loopback and speak plain HTTP.
 	certFile, err := s.settingService.GetCertFile()
 	if err != nil {
 		return err
@@ -601,13 +633,20 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 			logger.Info("Using XUI_PORT override for web panel port:", port)
 		}
 	}
-	listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
+	listenAddr := panelListenAddress(listen, port, s.edgeEnabled)
+	if s.edgeEnabled {
+		logger.Info("Panel listener moved to loopback behind the nginx perimeter")
+	}
 	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", listenAddr)
 	if err != nil {
 		return err
 	}
 	listener = network.NewLimitListener(listener, network.MaxPanelConns, network.MaxPanelConnsPerSource)
-	if certFile != "" || keyFile != "" {
+	if s.edgeEnabled {
+		// nginx terminates TLS in front of this listener; a second TLS layer here
+		// would answer an already decrypted connection with another handshake.
+		logger.Info("Web server running plain HTTP on", listener.Addr(), "behind the nginx perimeter")
+	} else if certFile != "" || keyFile != "" {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err == nil {
 			c := &tls.Config{
@@ -756,6 +795,19 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 		}
 	})
 
+	// The perimeter must be answering before xray starts: REALITY's destination is
+	// nginx, so starting xray first would send every non-client to a dead port.
+	if s.edgeEnabled {
+		if err := s.settingService.ApplyEdge(context.Background()); err != nil {
+			logger.Error("nginx perimeter failed to start, REALITY fallback has nowhere to go:", err)
+		}
+	}
+	// A firewall apply that was never confirmed arms a rollback on disk; a restart
+	// in that window must restore, or the operator stays locked out.
+	if err := service.NewFirewallService().RestorePending(context.Background()); err != nil {
+		logger.Error("pending firewall rollback was not restored:", err)
+	}
+
 	s.startTask(restartXray, loc)
 
 	if startTgBot {
@@ -789,6 +841,15 @@ func (s *Server) stop(stopXray bool, stopTgBot bool) error {
 	s.cancel()
 	var err1 error
 	var err2 error
+	// The perimeter has no point without the panel behind it, and leaving it up
+	// would keep answering TLS on a port nothing serves any more.
+	if s.edgeEnabled {
+		if mgr, err := s.settingService.EdgeManager(); err == nil {
+			if stopErr := mgr.Stop(context.Background()); stopErr != nil {
+				logger.Warning("nginx perimeter shutdown failed:", stopErr)
+			}
+		}
+	}
 	if s.httpServer != nil {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		err1 = s.httpServer.Shutdown(shutdownCtx)

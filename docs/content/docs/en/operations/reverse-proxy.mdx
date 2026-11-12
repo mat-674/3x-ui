@@ -9,6 +9,13 @@ automatic HTTPS, and hide the real ports behind ports 80/443. Prefer to let the
 panel terminate TLS directly? Get a certificate with the
 [`x-ui` SSL menu](/docs/config/ssl-certificates) instead.
 
+<Callout type="info">
+  This page is about a proxy **you** run and point at the panel. If you want one
+  port that also serves a decoy website and hides the panel behind REALITY, use
+  the [nginx perimeter](/docs/config/edge) instead: the panel generates and
+  drives that nginx itself, on loopback, behind Xray's 443.
+</Callout>
+
 ## Generate a config
 
 <ReverseProxyGenerator />

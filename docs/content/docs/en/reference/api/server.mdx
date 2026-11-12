@@ -131,6 +131,24 @@ _openapi:
       title: Return the last N lines of the panel’s own log.
       url: '#return-the-last-n-lines-of-the-panels-own-log'
     - depth: 2
+      title: List the log files this panel can hand out — its own log plus the nginx
+        perimeter’s access and error logs — with each file’s path, size, and
+        whether it exists. A perimeter log that is missing means nginx never
+        wrote one, which is itself the diagnosis.
+      url: '#list-the-log-files-this-panel-can-hand-out--its-own-log-plus-the-nginx-perimeters-access-and-error-logs--with-each-files-path-size-and-whether-it-exists-a-perimeter-log-that-is-missing-means-nginx-never-wrote-one-which-is-itself-the-diagnosis'
+    - depth: 2
+      title: Download the tail of one log file as an attachment. Tailing rather than
+        shipping the whole file keeps a rotated multi-megabyte log from filling
+        the response. The panel log is always written at debug level, so nothing
+        has to be enabled for it to be useful; a source that does not exist yet
+        returns an error rather than an empty file.
+      url: '#download-the-tail-of-one-log-file-as-an-attachment-tailing-rather-than-shipping-the-whole-file-keeps-a-rotated-multi-megabyte-log-from-filling-the-response-the-panel-log-is-always-written-at-debug-level-so-nothing-has-to-be-enabled-for-it-to-be-useful-a-source-that-does-not-exist-yet-returns-an-error-rather-than-an-empty-file'
+    - depth: 2
+      title: 'Set the panel’s log level and apply it to the running process. This
+        controls console/syslog verbosity only: the file log always records at
+        debug, so lowering it does not lose detail in a later download.'
+      url: '#set-the-panels-log-level-and-apply-it-to-the-running-process-this-controls-consolesyslog-verbosity-only-the-file-log-always-records-at-debug-so-lowering-it-does-not-lose-detail-in-a-later-download'
+    - depth: 2
       title: Return the last N lines of the Xray process log.
       url: '#return-the-last-n-lines-of-the-xray-process-log'
     - depth: 2
@@ -275,6 +293,21 @@ _openapi:
         id: refresh-a-single-geo-file-by-filename-eg-geoipdat-geositedat
       - content: Return the last N lines of the panel’s own log.
         id: return-the-last-n-lines-of-the-panels-own-log
+      - content: List the log files this panel can hand out — its own log plus the nginx
+          perimeter’s access and error logs — with each file’s path, size, and
+          whether it exists. A perimeter log that is missing means nginx never
+          wrote one, which is itself the diagnosis.
+        id: list-the-log-files-this-panel-can-hand-out--its-own-log-plus-the-nginx-perimeters-access-and-error-logs--with-each-files-path-size-and-whether-it-exists-a-perimeter-log-that-is-missing-means-nginx-never-wrote-one-which-is-itself-the-diagnosis
+      - content: Download the tail of one log file as an attachment. Tailing rather than
+          shipping the whole file keeps a rotated multi-megabyte log from
+          filling the response. The panel log is always written at debug level,
+          so nothing has to be enabled for it to be useful; a source that does
+          not exist yet returns an error rather than an empty file.
+        id: download-the-tail-of-one-log-file-as-an-attachment-tailing-rather-than-shipping-the-whole-file-keeps-a-rotated-multi-megabyte-log-from-filling-the-response-the-panel-log-is-always-written-at-debug-level-so-nothing-has-to-be-enabled-for-it-to-be-useful-a-source-that-does-not-exist-yet-returns-an-error-rather-than-an-empty-file
+      - content: 'Set the panel’s log level and apply it to the running process. This
+          controls console/syslog verbosity only: the file log always records at
+          debug, so lowering it does not lose detail in a later download.'
+        id: set-the-panels-log-level-and-apply-it-to-the-running-process-this-controls-consolesyslog-verbosity-only-the-file-log-always-records-at-debug-so-lowering-it-does-not-lose-detail-in-a-later-download
       - content: Return the last N lines of the Xray process log.
         id: return-the-last-n-lines-of-the-xray-process-log
       - content: Return live AmneziaWG peer activity (handshake, endpoint, transfer)
@@ -325,7 +358,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/logs/sources","method":"get"},{"path":"/panel/api/server/logs/export","method":"get"},{"path":"/panel/api/server/logLevel","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
     </>
   );
 }

@@ -21,10 +21,23 @@ export interface AllSetting {
   discordLang: string;
   discordMemory: number;
   discordRunTime: string;
+  edgeCertFile: string;
+  edgeEnable: boolean;
+  edgeKeyFile: string;
+  edgeListen: string;
+  edgeNginxBin: string;
+  edgePort: number;
+  edgeProxyProtocol: boolean;
+  edgeServerNames: string;
   expireDiff: number;
   externalSubUserAgent: string;
   externalTrafficInformEnable: boolean;
   externalTrafficInformURI: string;
+  firewallAllow: string;
+  firewallManageSSH: boolean;
+  firewallNftBin: string;
+  firewallSSHPort: number;
+  frontSiteId: number;
   happLinkEnable: boolean;
   ipLimitAllowlist: string;
   ldapAutoCreate: boolean;
@@ -48,9 +61,11 @@ export interface AllSetting {
   ldapUserAttr: string;
   ldapUserFilter: string;
   ldapVlessField: string;
+  logLevel: string;
   nodeDownThreshold: number;
   outboundDownThreshold: number;
   pageSize: number;
+  panelCookieName: string;
   panelOutbound: string;
   realityScanCandidates: string;
   remarkTemplate: string;
@@ -204,10 +219,23 @@ export interface AllSettingView {
   discordLang: string;
   discordMemory: number;
   discordRunTime: string;
+  edgeCertFile: string;
+  edgeEnable: boolean;
+  edgeKeyFile: string;
+  edgeListen: string;
+  edgeNginxBin: string;
+  edgePort: number;
+  edgeProxyProtocol: boolean;
+  edgeServerNames: string;
   expireDiff: number;
   externalSubUserAgent: string;
   externalTrafficInformEnable: boolean;
   externalTrafficInformURI: string;
+  firewallAllow: string;
+  firewallManageSSH: boolean;
+  firewallNftBin: string;
+  firewallSSHPort: number;
+  frontSiteId: number;
   happLinkEnable: boolean;
   hasApiToken: boolean;
   hasDiscordBotToken: boolean;
@@ -239,9 +267,11 @@ export interface AllSettingView {
   ldapUserAttr: string;
   ldapUserFilter: string;
   ldapVlessField: string;
+  logLevel: string;
   nodeDownThreshold: number;
   outboundDownThreshold: number;
   pageSize: number;
+  panelCookieName: string;
   panelOutbound: string;
   realityScanCandidates: string;
   remarkTemplate: string;
@@ -606,9 +636,56 @@ export interface ClientsSummary {
   total: number;
 }
 
+export interface EdgeStatus {
+  certDomains: string[];
+  certNotAfter: string;
+  configValid: boolean;
+  enabled: boolean;
+  listen: string;
+  message: string;
+  nginxBin: string;
+  nginxHint: string;
+  nginxInstallable: boolean;
+  nginxInstalled: boolean;
+  nginxVersion: string;
+  panelUpstream: string;
+  port: number;
+  running: boolean;
+  serverNames: string[];
+  subPrefixes: number;
+}
+
 export interface FallbackParentInfo {
   masterId: number;
   path?: string;
+}
+
+export interface FrontCert {
+  acmeEmail: string;
+  certPath: string;
+  createdAt: string;
+  domains: string;
+  id: number;
+  issuer: string;
+  keyPath: string;
+  lastAttempt?: string | null;
+  lastError: string;
+  mode: string;
+  nextAttempt?: string | null;
+  notAfter?: string | null;
+  updatedAt: string;
+}
+
+export interface FrontSite {
+  active: boolean;
+  bytes: number;
+  createdAt: string;
+  dir: string;
+  entryFile: string;
+  fileCount: number;
+  id: number;
+  name: string;
+  sha256: string;
 }
 
 export interface GeoCategory {

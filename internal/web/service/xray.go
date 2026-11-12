@@ -491,6 +491,17 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 
 	xrayConfig.RouterConfig = dropRefusedScript(xrayConfig.RouterConfig, "routing", routingScriptRefused)
 	xrayConfig.DNSConfig = dropRefusedScript(xrayConfig.DNSConfig, "dns", dnsScriptRefused)
+
+	// REALITY's fallback destination is the perimeter: one that is enabled but not
+	// answering leaves every non-client refused, yet must warn and not fail the config.
+	if edgeSettings, edgeErr := s.settingService.GetEdgeSettings(); edgeErr != nil {
+		logger.Warning("read nginx perimeter settings failed:", edgeErr)
+	} else if edgeSettings.Enable {
+		addr := edgeProbeAddr(edgeSettings.Listen, edgeSettings.Port)
+		for _, warning := range edgeRealityFallbackWarnings(xrayConfig.InboundConfigs, addr, dialEdge) {
+			logger.Warning(warning)
+		}
+	}
 	return xrayConfig, nil
 }
 

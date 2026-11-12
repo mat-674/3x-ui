@@ -20,12 +20,30 @@ type Msg struct {
 }
 
 type AllSetting struct {
-	WebListen             string `json:"webListen" form:"webListen"`
-	WebDomain             string `json:"webDomain" form:"webDomain"`
-	WebPort               int    `json:"webPort" form:"webPort" validate:"gte=1,lte=65535"`
-	WebCertFile           string `json:"webCertFile" form:"webCertFile"`
-	WebKeyFile            string `json:"webKeyFile" form:"webKeyFile"`
-	WebBasePath           string `json:"webBasePath" form:"webBasePath"`
+	WebListen   string `json:"webListen" form:"webListen"`
+	WebDomain   string `json:"webDomain" form:"webDomain"`
+	WebPort     int    `json:"webPort" form:"webPort" validate:"gte=1,lte=65535"`
+	WebCertFile string `json:"webCertFile" form:"webCertFile"`
+	WebKeyFile  string `json:"webKeyFile" form:"webKeyFile"`
+	WebBasePath string `json:"webBasePath" form:"webBasePath"`
+	// Decoy site the perimeter proxy serves; 0 means none selected.
+	FrontSiteId     int    `json:"frontSiteId" form:"frontSiteId" validate:"gte=0"`
+	PanelCookieName string `json:"panelCookieName" form:"panelCookieName"`
+	// nginx perimeter behind the REALITY fallback.
+	EdgeEnable        bool   `json:"edgeEnable" form:"edgeEnable"`
+	EdgeListen        string `json:"edgeListen" form:"edgeListen"`
+	EdgePort          int    `json:"edgePort" form:"edgePort" validate:"gte=1,lte=65535"`
+	EdgeServerNames   string `json:"edgeServerNames" form:"edgeServerNames"`
+	EdgeCertFile      string `json:"edgeCertFile" form:"edgeCertFile"`
+	EdgeKeyFile       string `json:"edgeKeyFile" form:"edgeKeyFile"`
+	EdgeNginxBin      string `json:"edgeNginxBin" form:"edgeNginxBin"`
+	EdgeProxyProtocol bool   `json:"edgeProxyProtocol" form:"edgeProxyProtocol"`
+	// nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the
+	// firewall untouched.
+	FirewallSSHPort       int    `json:"firewallSSHPort" form:"firewallSSHPort" validate:"gte=0,lte=65535"`
+	FirewallManageSSH     bool   `json:"firewallManageSSH" form:"firewallManageSSH"`
+	FirewallAllow         string `json:"firewallAllow" form:"firewallAllow"`
+	FirewallNftBin        string `json:"firewallNftBin" form:"firewallNftBin"`
 	SessionMaxAge         int    `json:"sessionMaxAge" form:"sessionMaxAge" validate:"gte=1,lte=525600"`
 	TrustedProxyCIDRs     string `json:"trustedProxyCIDRs" form:"trustedProxyCIDRs"`
 	RealityScanCandidates string `json:"realityScanCandidates" form:"realityScanCandidates"`
@@ -33,6 +51,7 @@ type AllSetting struct {
 	PanelOutbound         string `json:"panelOutbound" form:"panelOutbound"`
 
 	PageSize                   int    `json:"pageSize" form:"pageSize" validate:"gte=0,lte=1000"`
+	LogLevel                   string `json:"logLevel" form:"logLevel" validate:"oneof=debug info notice warning error" example:"info"`
 	ExpireDiff                 int    `json:"expireDiff" form:"expireDiff" validate:"gte=0"`
 	TrafficDiff                int    `json:"trafficDiff" form:"trafficDiff" validate:"gte=0,lte=100"`
 	RemarkTemplate             string `json:"remarkTemplate" form:"remarkTemplate"`
@@ -214,6 +233,31 @@ type AllSetting struct {
 	LdapDefaultLimitIP     int    `json:"ldapDefaultLimitIP" form:"ldapDefaultLimitIP" validate:"gte=0"`
 
 	WarpUpdateInterval int `json:"warpUpdateInterval" form:"warpUpdateInterval" validate:"gte=0"`
+}
+
+// EdgeStatus is the nginx perimeter's reported state: whether it answers, whether
+// the config the panel would generate is complete, and the certificate behind it.
+type EdgeStatus struct {
+	Enabled       bool     `json:"enabled" example:"true"`
+	Running       bool     `json:"running" example:"true"`
+	ConfigValid   bool     `json:"configValid" example:"true"`
+	Listen        string   `json:"listen" example:"127.0.0.1"`
+	Port          int      `json:"port" example:"8443"`
+	ServerNames   []string `json:"serverNames"`
+	PanelUpstream string   `json:"panelUpstream" example:"127.0.0.1:2053"`
+	SubPrefixes   int      `json:"subPrefixes" example:"3"`
+	CertDomains   []string `json:"certDomains"`
+	CertNotAfter  string   `json:"certNotAfter" example:"2027-03-02T10:04:05Z"`
+	Message       string   `json:"message" example:""`
+	// NginxInstalled drives the install button: without the binary nothing else
+	// on the page can work, so the UI has to know before an apply is attempted.
+	NginxInstalled bool   `json:"nginxInstalled" example:"true"`
+	NginxVersion   string `json:"nginxVersion" example:"1.24.0"`
+	NginxBin       string `json:"nginxBin" example:"/usr/sbin/nginx"`
+	// NginxInstallable says whether this host can install it at all, and Hint
+	// carries the reason when it cannot, so the button is never a dead end.
+	NginxInstallable bool   `json:"nginxInstallable" example:"true"`
+	NginxHint        string `json:"nginxHint" example:""`
 }
 
 type AllSettingView struct {

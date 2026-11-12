@@ -1,0 +1,17 @@
+.firewall-error-detail {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.firewall-config-text textarea,
+textarea.firewall-config-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.firewall-rollback {
+  margin-bottom: 12px;
+}

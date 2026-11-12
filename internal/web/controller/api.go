@@ -6,6 +6,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/middleware"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/panel"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/tgbot"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
@@ -235,6 +236,18 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 
 	// Client-side chain hops (SOCKS/HTTP upstream proxies) and their selectors
 	NewChainProxyController(api)
+
+	// Decoy websites the nginx perimeter serves to visitors who are not on the panel
+	NewFrontController(api)
+
+	// Certificates that perimeter presents, with the reload report
+	NewFrontCertController(api, service.DefaultFrontCertService())
+
+	// The nginx perimeter itself: generated config, status and apply lifecycle
+	NewEdgeController(api)
+
+	// Host firewall: rendered ruleset, status, and apply with a rollback window
+	NewFirewallController(api)
 
 	// Extra routes
 	api.POST("/backuptotgbot", a.BackuptoTgbot)

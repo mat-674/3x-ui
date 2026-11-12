@@ -66,18 +66,39 @@ var defaultValueMap = map[string]string{
 	// cert are minted lazily on first use, and the node-side trust CA is pasted
 	// in by the operator. Kept out of entity.AllSetting so private keys never
 	// reach the settings UI/export.
-	"nodeMtlsCaCertPem":           "",
-	"nodeMtlsCaKeyPem":            "",
-	"nodeMtlsClientCertPem":       "",
-	"nodeMtlsClientKeyPem":        "",
-	"nodeMtlsClientCertSha256":    "",
-	"nodeMtlsClientCAPem":         "",
-	"webBasePath":                 normalizeBasePath(getEnv("XUI_INIT_WEB_BASE_PATH", "/")),
-	"sessionMaxAge":               "360",
-	"trustedProxyCIDRs":           DefaultTrustedProxyCIDRs,
+	"nodeMtlsCaCertPem":        "",
+	"nodeMtlsCaKeyPem":         "",
+	"nodeMtlsClientCertPem":    "",
+	"nodeMtlsClientKeyPem":     "",
+	"nodeMtlsClientCertSha256": "",
+	"nodeMtlsClientCAPem":      "",
+	"webBasePath":              normalizeBasePath(getEnv("XUI_INIT_WEB_BASE_PATH", "/")),
+	"sessionMaxAge":            "360",
+	"trustedProxyCIDRs":        DefaultTrustedProxyCIDRs,
+	"frontSiteId":              "0",
+	"panelCookieName":          "sess",
+	// nginx perimeter behind the xray REALITY fallback. Empty cert paths fall back
+	// to webCertFile/webKeyFile, so an operator who already set a certificate gets
+	// the same one on the perimeter.
+	"edgeEnable":        "false",
+	"edgeListen":        "127.0.0.1",
+	"edgePort":          "8443",
+	"edgeServerNames":   "",
+	"edgeCertFile":      "",
+	"edgeKeyFile":       "",
+	"edgeNginxBin":      "",
+	"edgeProxyProtocol": "true",
+	// nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the
+	// firewall alone, which is the only safe default: it cannot know how the
+	// operator reaches the box.
+	"firewallSSHPort":             "0",
+	"firewallManageSSH":           "false",
+	"firewallAllow":               "",
+	"firewallNftBin":              "",
 	"realityScanCandidates":       DefaultRealityScanCandidatesCSV,
 	"ipLimitAllowlist":            "",
 	"pageSize":                    "25",
+	"logLevel":                    "info",
 	"expireDiff":                  "0",
 	"trafficDiff":                 "0",
 	"remarkTemplate":              DefaultRemarkTemplate,
@@ -534,6 +555,18 @@ func (s *SettingService) SetListen(ip string) error {
 
 func (s *SettingService) GetWebDomain() (string, error) {
 	return s.getString("webDomain")
+}
+
+// GetCookieName returns the panel session cookie name.
+func (s *SettingService) GetCookieName() (string, error) {
+	name, err := s.getString("panelCookieName")
+	if err != nil {
+		return "", err
+	}
+	if name = strings.TrimSpace(name); name == "" {
+		return "sess", nil
+	}
+	return name, nil
 }
 
 func (s *SettingService) GetTgBotToken() (string, error) {
@@ -1667,6 +1700,14 @@ type SecretClears struct {
 }
 
 func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears SecretClears) error {
+	// Normalised before validation: an empty stored value must become info rather
+	// than fail the oneof check and block every other setting from saving.
+	logLevel, err := NormalizeLogLevel(allSetting.LogLevel)
+	if err != nil {
+		return err
+	}
+	allSetting.LogLevel = logLevel
+
 	switch allSetting.SubHostSortMode {
 	case "":
 		allSetting.SubHostSortMode = "inbound-first"
@@ -1704,7 +1745,7 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	fields := reflect_util.GetFields(t)
 
 	db := database.GetDB()
-	return db.Transaction(func(tx *gorm.DB) error {
+	saveErr := db.Transaction(func(tx *gorm.DB) error {
 		var existing []*model.Setting
 		if err := tx.Find(&existing).Error; err != nil {
 			return err
@@ -1733,6 +1774,13 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 		}
 		return nil
 	})
+	if err := saveErr; err != nil {
+		return err
+	}
+	// After the transaction: a level the operator just picked must apply to the
+	// running process immediately, not on the next restart.
+	logger.InitLogger(logLevels[allSetting.LogLevel])
+	return nil
 }
 
 func validateSubUserAgentRegexes(allSetting *entity.AllSetting) error {

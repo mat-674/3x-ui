@@ -75,6 +75,9 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.POST("/updateGeofile", a.updateGeofile)
 	g.POST("/updateGeofile/:fileName", a.updateGeofile)
 	g.POST("/logs/:count", a.getLogs)
+	g.GET("/logs/sources", a.getLogSources)
+	g.GET("/logs/export", a.exportLog)
+	g.POST("/logLevel", a.setLogLevel)
 	g.POST("/xraylogs/:count", a.getXrayLogs)
 	g.POST("/amneziawglogs/:count", a.getAmneziaWGLogs)
 	g.POST("/importDB", a.importDB)
@@ -306,6 +309,47 @@ func (a *ServerController) restartXrayService(c *gin.Context) {
 func (a *ServerController) getLogs(c *gin.Context) {
 	logs := a.serverService.GetLogs(c.Param("count"), c.PostForm("level"), c.PostForm("syslog"))
 	jsonObj(c, logs, nil)
+}
+
+// setLogLevel switches the panel's log level from the diagnostics page. The file
+// log always records DEBUG; this changes what also reaches the console/syslog.
+func (a *ServerController) setLogLevel(c *gin.Context) {
+	var body struct {
+		Level string `json:"level" form:"level"`
+	}
+	if err := c.ShouldBind(&body); err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	level, err := (&service.SettingService{}).SetLogLevel(body.Level)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonObj(c, gin.H{"level": level}, nil)
+}
+
+// getLogSources lists the files the diagnostics page can download, with whether
+// each exists: a missing perimeter log is itself the answer to "why is the site
+// down".
+func (a *ServerController) getLogSources(c *gin.Context) {
+	jsonObj(c, (&service.SettingService{}).AvailableLogs(), nil)
+}
+
+// exportLog streams the tail of one log file as a download. Tailing bounds the
+// response for a rotated multi-megabyte log; the panel log already records at
+// DEBUG, so no flag has to be enabled for the file to be useful.
+func (a *ServerController) exportLog(c *gin.Context) {
+	lines, _ := strconv.Atoi(c.DefaultQuery("lines", "5000"))
+	data, filename, err := (&service.SettingService{}).ExportLog(c.Query("source"), lines)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Header("Cache-Control", "no-store")
+	_, _ = c.Writer.Write(data)
 }
 
 // getXrayLogs retrieves Xray logs with filtering options for direct, blocked, and proxy traffic.

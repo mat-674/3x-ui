@@ -65,6 +65,33 @@
           "discordRunTime": {
             "type": "string"
           },
+          "edgeCertFile": {
+            "type": "string"
+          },
+          "edgeEnable": {
+            "description": "nginx perimeter behind the REALITY fallback.",
+            "type": "boolean"
+          },
+          "edgeKeyFile": {
+            "type": "string"
+          },
+          "edgeListen": {
+            "type": "string"
+          },
+          "edgeNginxBin": {
+            "type": "string"
+          },
+          "edgePort": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "edgeProxyProtocol": {
+            "type": "boolean"
+          },
+          "edgeServerNames": {
+            "type": "string"
+          },
           "expireDiff": {
             "minimum": 0,
             "type": "integer"
@@ -77,6 +104,26 @@
           },
           "externalTrafficInformURI": {
             "type": "string"
+          },
+          "firewallAllow": {
+            "type": "string"
+          },
+          "firewallManageSSH": {
+            "type": "boolean"
+          },
+          "firewallNftBin": {
+            "type": "string"
+          },
+          "firewallSSHPort": {
+            "description": "nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the\nfirewall untouched.",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "frontSiteId": {
+            "description": "Decoy site the perimeter proxy serves; 0 means none selected.",
+            "minimum": 0,
+            "type": "integer"
           },
           "happLinkEnable": {
             "type": "boolean"
@@ -152,6 +199,17 @@
           "ldapVlessField": {
             "type": "string"
           },
+          "logLevel": {
+            "enum": [
+              "debug",
+              "info",
+              "notice",
+              "warning",
+              "error"
+            ],
+            "example": "info",
+            "type": "string"
+          },
           "nodeDownThreshold": {
             "maximum": 100,
             "minimum": 1,
@@ -166,6 +224,9 @@
             "maximum": 1000,
             "minimum": 0,
             "type": "integer"
+          },
+          "panelCookieName": {
+            "type": "string"
           },
           "panelOutbound": {
             "type": "string"
@@ -621,10 +682,23 @@
           "discordLang",
           "discordMemory",
           "discordRunTime",
+          "edgeCertFile",
+          "edgeEnable",
+          "edgeKeyFile",
+          "edgeListen",
+          "edgeNginxBin",
+          "edgePort",
+          "edgeProxyProtocol",
+          "edgeServerNames",
           "expireDiff",
           "externalSubUserAgent",
           "externalTrafficInformEnable",
           "externalTrafficInformURI",
+          "firewallAllow",
+          "firewallManageSSH",
+          "firewallNftBin",
+          "firewallSSHPort",
+          "frontSiteId",
           "happLinkEnable",
           "ipLimitAllowlist",
           "ldapAutoCreate",
@@ -648,9 +722,11 @@
           "ldapUserAttr",
           "ldapUserFilter",
           "ldapVlessField",
+          "logLevel",
           "nodeDownThreshold",
           "outboundDownThreshold",
           "pageSize",
+          "panelCookieName",
           "panelOutbound",
           "realityScanCandidates",
           "remarkTemplate",
@@ -832,6 +908,33 @@
           "discordRunTime": {
             "type": "string"
           },
+          "edgeCertFile": {
+            "type": "string"
+          },
+          "edgeEnable": {
+            "description": "nginx perimeter behind the REALITY fallback.",
+            "type": "boolean"
+          },
+          "edgeKeyFile": {
+            "type": "string"
+          },
+          "edgeListen": {
+            "type": "string"
+          },
+          "edgeNginxBin": {
+            "type": "string"
+          },
+          "edgePort": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "edgeProxyProtocol": {
+            "type": "boolean"
+          },
+          "edgeServerNames": {
+            "type": "string"
+          },
           "expireDiff": {
             "minimum": 0,
             "type": "integer"
@@ -844,6 +947,26 @@
           },
           "externalTrafficInformURI": {
             "type": "string"
+          },
+          "firewallAllow": {
+            "type": "string"
+          },
+          "firewallManageSSH": {
+            "type": "boolean"
+          },
+          "firewallNftBin": {
+            "type": "string"
+          },
+          "firewallSSHPort": {
+            "description": "nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the\nfirewall untouched.",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "frontSiteId": {
+            "description": "Decoy site the perimeter proxy serves; 0 means none selected.",
+            "minimum": 0,
+            "type": "integer"
           },
           "happLinkEnable": {
             "type": "boolean"
@@ -943,6 +1066,17 @@
           "ldapVlessField": {
             "type": "string"
           },
+          "logLevel": {
+            "enum": [
+              "debug",
+              "info",
+              "notice",
+              "warning",
+              "error"
+            ],
+            "example": "info",
+            "type": "string"
+          },
           "nodeDownThreshold": {
             "maximum": 100,
             "minimum": 1,
@@ -957,6 +1091,9 @@
             "maximum": 1000,
             "minimum": 0,
             "type": "integer"
+          },
+          "panelCookieName": {
+            "type": "string"
           },
           "panelOutbound": {
             "type": "string"
@@ -1412,10 +1549,23 @@
           "discordLang",
           "discordMemory",
           "discordRunTime",
+          "edgeCertFile",
+          "edgeEnable",
+          "edgeKeyFile",
+          "edgeListen",
+          "edgeNginxBin",
+          "edgePort",
+          "edgeProxyProtocol",
+          "edgeServerNames",
           "expireDiff",
           "externalSubUserAgent",
           "externalTrafficInformEnable",
           "externalTrafficInformURI",
+          "firewallAllow",
+          "firewallManageSSH",
+          "firewallNftBin",
+          "firewallSSHPort",
+          "frontSiteId",
           "happLinkEnable",
           "hasApiToken",
           "hasDiscordBotToken",
@@ -1447,9 +1597,11 @@
           "ldapUserAttr",
           "ldapUserFilter",
           "ldapVlessField",
+          "logLevel",
           "nodeDownThreshold",
           "outboundDownThreshold",
           "pageSize",
+          "panelCookieName",
           "panelOutbound",
           "realityScanCandidates",
           "remarkTemplate",
@@ -2662,6 +2814,98 @@
         ],
         "type": "object"
       },
+      "EdgeStatus": {
+        "description": "EdgeStatus is the nginx perimeter's reported state: whether it answers, whether\nthe config the panel would generate is complete, and the certificate behind it.",
+        "properties": {
+          "certDomains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "certNotAfter": {
+            "example": "2027-03-02T10:04:05Z",
+            "type": "string"
+          },
+          "configValid": {
+            "example": true,
+            "type": "boolean"
+          },
+          "enabled": {
+            "example": true,
+            "type": "boolean"
+          },
+          "listen": {
+            "example": "127.0.0.1",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "nginxBin": {
+            "example": "/usr/sbin/nginx",
+            "type": "string"
+          },
+          "nginxHint": {
+            "type": "string"
+          },
+          "nginxInstallable": {
+            "description": "NginxInstallable says whether this host can install it at all, and Hint\ncarries the reason when it cannot, so the button is never a dead end.",
+            "example": true,
+            "type": "boolean"
+          },
+          "nginxInstalled": {
+            "description": "NginxInstalled drives the install button: without the binary nothing else\non the page can work, so the UI has to know before an apply is attempted.",
+            "example": true,
+            "type": "boolean"
+          },
+          "nginxVersion": {
+            "example": "1.24.0",
+            "type": "string"
+          },
+          "panelUpstream": {
+            "example": "127.0.0.1:2053",
+            "type": "string"
+          },
+          "port": {
+            "example": 8443,
+            "type": "integer"
+          },
+          "running": {
+            "example": true,
+            "type": "boolean"
+          },
+          "serverNames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "subPrefixes": {
+            "example": 3,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "certDomains",
+          "certNotAfter",
+          "configValid",
+          "enabled",
+          "listen",
+          "message",
+          "nginxBin",
+          "nginxHint",
+          "nginxInstallable",
+          "nginxInstalled",
+          "nginxVersion",
+          "panelUpstream",
+          "port",
+          "running",
+          "serverNames",
+          "subPrefixes"
+        ],
+        "type": "object"
+      },
       "FallbackParentInfo": {
         "description": "FallbackParentInfo carries everything the frontend needs to rewrite a\nchild inbound's client link: where to connect (the master's address\nand port) and which path matched on the master's fallbacks array.\nThe frontend already has the master inbound in its dbInbounds list,\nso we only ship identifiers + the match path here.",
         "properties": {
@@ -2674,6 +2918,139 @@
         },
         "required": [
           "masterId"
+        ],
+        "type": "object"
+      },
+      "FrontCert": {
+        "description": "FrontCert is one TLS certificate the front presents, keyed by the server\nnames it covers. Private keys stay on disk (0600): the rows carry paths only,\nthe same split node mTLS material uses, so keys never reach settings export.",
+        "properties": {
+          "acmeEmail": {
+            "example": "admin@example.com",
+            "type": "string"
+          },
+          "certPath": {
+            "example": "/etc/x-ui/front/certs/panel.crt",
+            "type": "string"
+          },
+          "createdAt": {
+            "example": "2026-01-02T15:04:05Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "domains": {
+            "example": "panel.example.com",
+            "type": "string"
+          },
+          "id": {
+            "example": 1,
+            "type": "integer"
+          },
+          "issuer": {
+            "description": "Issuer is \"file\" for an operator-supplied pair or \"acme\" for one this\npanel obtained; AcmeEmail is the account contact used for the latter.",
+            "example": "acme",
+            "type": "string"
+          },
+          "keyPath": {
+            "example": "/etc/x-ui/front/certs/panel.key",
+            "type": "string"
+          },
+          "lastAttempt": {
+            "example": "2026-01-02T15:04:05Z",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "mode": {
+            "example": "file",
+            "type": "string"
+          },
+          "nextAttempt": {
+            "example": "2026-03-02T15:04:05Z",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "notAfter": {
+            "example": "2026-04-02T15:04:05Z",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "updatedAt": {
+            "example": "2026-01-02T15:04:05Z",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "acmeEmail",
+          "certPath",
+          "createdAt",
+          "domains",
+          "id",
+          "issuer",
+          "keyPath",
+          "lastError",
+          "mode",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "FrontSite": {
+        "description": "FrontSite is an uploaded decoy website served by the TLS front on the panel's\npublic port. Files live on disk under Dir; only metadata is stored here, so a\npanel backup never carries a whole website.",
+        "properties": {
+          "active": {
+            "example": true,
+            "type": "boolean"
+          },
+          "bytes": {
+            "example": 204800,
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdAt": {
+            "example": "2026-01-02T15:04:05Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "dir": {
+            "example": "/etc/x-ui/front/sites/1",
+            "type": "string"
+          },
+          "entryFile": {
+            "example": "index.html",
+            "type": "string"
+          },
+          "fileCount": {
+            "example": 42,
+            "type": "integer"
+          },
+          "id": {
+            "example": 1,
+            "type": "integer"
+          },
+          "name": {
+            "example": "corporate",
+            "type": "string"
+          },
+          "sha256": {
+            "example": "9f2c...",
+            "type": "string"
+          }
+        },
+        "required": [
+          "active",
+          "bytes",
+          "createdAt",
+          "dir",
+          "entryFile",
+          "fileCount",
+          "id",
+          "name",
+          "sha256"
         ],
         "type": "object"
       },
@@ -5215,6 +5592,22 @@
     {
       "name": "Chain Selectors",
       "description": "Groups of chain proxies so a client picks its entry hop by strategy. An inbound names either one chain proxy or one selector. A selector with several usable hops emits one endpoint copy per hop plus a routing balancer in the JSON subscription, and one mihomo proxy group (url-test for leastPing, load-balance otherwise)."
+    },
+    {
+      "name": "Front Sites",
+      "description": "Decoy websites the nginx perimeter serves: what a visitor, a scanner or a probe sees when the request is not for the panel. Each site is one uploaded .zip, extracted under the panel folder; the database holds metadata only, so a panel backup never carries a whole website. At most one site is active, and that is the document an unauthenticated visitor sees."
+    },
+    {
+      "name": "Nginx Perimeter",
+      "description": "The nginx instance the panel generates and drives: it sits behind the REALITY fallback, terminates TLS with the real certificate, serves the decoy site to everyone, and proxies the panel and the subscription on their secret paths. The panel owns the whole config file, so its state is regenerated from settings rather than read from disk."
+    },
+    {
+      "name": "Firewall",
+      "description": "The host firewall the panel renders and loads: an nftables table of its own, input policy drop, with only loopback, established traffic, ICMP, the SSH port and the public TLS port accepted. It replaces only its own table, so Docker and fail2ban rules are untouched. Apply cannot lock the operator out: it refuses without a confirmation window, and restores the previous ruleset if that window passes unconfirmed, including across a panel restart."
+    },
+    {
+      "name": "Front Certificates",
+      "description": "The TLS certificates the perimeter presents, keyed by the server names they cover. Private keys stay on disk: only their paths are stored and returned. A replaced pair is picked up without restarting the panel, and a pair that fails to load keeps the last working material instead of taking the site down."
     },
     {
       "name": "Subscription Server",
@@ -7814,6 +8207,183 @@
                     "2025/01/01 12:00:00 [INFO] Server started",
                     "2025/01/01 12:00:01 [INFO] Xray is running"
                   ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/logs/sources": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "List the log files this panel can hand out — its own log plus the nginx perimeter’s access and error logs — with each file’s path, size, and whether it exists. A perimeter log that is missing means nginx never wrote one, which is itself the diagnosis.",
+        "operationId": "get_panel_api_server_logs_sources",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "enum": [
+                              "app",
+                              "edge-access",
+                              "edge-error"
+                            ]
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "exists": {
+                            "type": "boolean"
+                          },
+                          "size": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/logs/export": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Download the tail of one log file as an attachment. Tailing rather than shipping the whole file keeps a rotated multi-megabyte log from filling the response. The panel log is always written at debug level, so nothing has to be enabled for it to be useful; a source that does not exist yet returns an error rather than an empty file.",
+        "operationId": "get_panel_api_server_logs_export",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "description": "app (panel log), edge-access or edge-error (nginx perimeter).",
+            "schema": {
+              "type": "string",
+              "default": "app",
+              "enum": [
+                "app",
+                "edge-access",
+                "edge-error"
+              ]
+            }
+          },
+          {
+            "name": "lines",
+            "in": "query",
+            "required": true,
+            "description": "How many trailing lines to return; capped at 50000.",
+            "schema": {
+              "type": "integer",
+              "default": 5000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/logLevel": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Set the panel’s log level and apply it to the running process. This controls console/syslog verbosity only: the file log always records at debug, so lowering it does not lose detail in a later download.",
+        "operationId": "post_panel_api_server_logLevel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "debug",
+                      "info",
+                      "notice",
+                      "warning",
+                      "error"
+                    ],
+                    "description": "One of debug, info, notice, warning, error."
+                  }
+                },
+                "required": [
+                  "level"
+                ]
+              },
+              "example": {
+                "level": "debug"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -16824,6 +17394,1060 @@
                     "remark": "entries-fastest",
                     "strategy": "leastPing",
                     "updatedAt": 1710000000000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/front/sites": {
+      "get": {
+        "tags": [
+          "Front Sites"
+        ],
+        "summary": "List every stored site, oldest first, with its size, file count and archive hash.",
+        "operationId": "get_panel_api_front_sites",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FrontSite"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "active": true,
+                      "bytes": 204800,
+                      "createdAt": "2026-01-02T15:04:05Z",
+                      "dir": "/etc/x-ui/front/sites/1",
+                      "entryFile": "index.html",
+                      "fileCount": 42,
+                      "id": 1,
+                      "name": "corporate",
+                      "sha256": "9f2c..."
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/front/sites/upload": {
+      "post": {
+        "tags": [
+          "Front Sites"
+        ],
+        "summary": "Upload a zipped site. The archive is validated before anything is written: an entry that escapes the site directory (absolute, .., backslash or drive letter), a symlink or special file, more than 5000 entries, a path deeper than 16 levels, or more than 128 MiB of uncompressed data rejects the whole upload and leaves no directory behind. One wrapping top-level folder is stripped, and index.html (else the only .html file) becomes the entry document.",
+        "operationId": "post_panel_api_front_sites_upload",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The site as a .zip archive."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Unique display name for the site."
+                  }
+                },
+                "required": [
+                  "file",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/FrontSite"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "active": true,
+                    "bytes": 204800,
+                    "createdAt": "2026-01-02T15:04:05Z",
+                    "dir": "/etc/x-ui/front/sites/1",
+                    "entryFile": "index.html",
+                    "fileCount": 42,
+                    "id": 1,
+                    "name": "corporate",
+                    "sha256": "9f2c..."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/front/sites/{id}/activate": {
+      "post": {
+        "tags": [
+          "Front Sites"
+        ],
+        "summary": "Make this site the one the perimeter serves, clearing the active flag from every other site in the same transaction.",
+        "operationId": "post_panel_api_front_sites_id_activate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Front site id.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/FrontSite"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "active": true,
+                    "bytes": 204800,
+                    "createdAt": "2026-01-02T15:04:05Z",
+                    "dir": "/etc/x-ui/front/sites/1",
+                    "entryFile": "index.html",
+                    "fileCount": 42,
+                    "id": 1,
+                    "name": "corporate",
+                    "sha256": "9f2c..."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/front/sites/{id}/delete": {
+      "post": {
+        "tags": [
+          "Front Sites"
+        ],
+        "summary": "Delete a site and its files. The active site is refused: activate another site first.",
+        "operationId": "post_panel_api_front_sites_id_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Front site id.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/FrontSite"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "active": true,
+                    "bytes": 204800,
+                    "createdAt": "2026-01-02T15:04:05Z",
+                    "dir": "/etc/x-ui/front/sites/1",
+                    "entryFile": "index.html",
+                    "fileCount": 42,
+                    "id": 1,
+                    "name": "corporate",
+                    "sha256": "9f2c..."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/edge/status": {
+      "get": {
+        "tags": [
+          "Nginx Perimeter"
+        ],
+        "summary": "Whether the perimeter is enabled, whether it answers on its listen address, whether the config it would generate is complete, which names it serves, and the expiry of the certificate behind it. Read-only: it never starts or reloads anything.",
+        "operationId": "get_panel_api_edge_status",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/EdgeStatus"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "certDomains": [
+                      ""
+                    ],
+                    "certNotAfter": "2027-03-02T10:04:05Z",
+                    "configValid": true,
+                    "enabled": true,
+                    "listen": "127.0.0.1",
+                    "message": "",
+                    "nginxBin": "/usr/sbin/nginx",
+                    "nginxHint": "",
+                    "nginxInstallable": true,
+                    "nginxInstalled": true,
+                    "nginxVersion": "1.24.0",
+                    "panelUpstream": "127.0.0.1:2053",
+                    "port": 8443,
+                    "running": true,
+                    "serverNames": [
+                      ""
+                    ],
+                    "subPrefixes": 3
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/edge/config": {
+      "get": {
+        "tags": [
+          "Nginx Perimeter"
+        ],
+        "summary": "The exact nginx configuration text that apply would write, so it can be compared against what the running perimeter actually loaded.",
+        "operationId": "get_panel_api_edge_config",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "config": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/edge/apply": {
+      "post": {
+        "tags": [
+          "Nginx Perimeter"
+        ],
+        "summary": "Render, validate and activate the perimeter. The generated config is written first and checked with `nginx -t`; only a config nginx accepts is loaded, so a bad setting cannot take the perimeter down. Starts nginx when it is stopped and reloads it otherwise.",
+        "operationId": "post_panel_api_edge_apply",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/edge/stop": {
+      "post": {
+        "tags": [
+          "Nginx Perimeter"
+        ],
+        "summary": "Stop the perimeter gracefully, letting in-flight requests finish.",
+        "operationId": "post_panel_api_edge_stop",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/edge/preset": {
+      "post": {
+        "tags": [
+          "Nginx Perimeter"
+        ],
+        "summary": "Build the whole single-port arrangement in one call: a VLESS+REALITY inbound on the public port whose fallback is the perimeter, with generated REALITY keys, the domain as its server name, and `xver` matching the perimeter PROXY-protocol setting. The perimeter must be enabled first, because REALITY needs a fallback that answers like a real site; the domain is also written to edgeServerNames so the certificate and the advertised server name cannot drift apart.",
+        "operationId": "post_panel_api_edge_preset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The certificate name and the REALITY server name; also written to edgeServerNames."
+                  },
+                  "listen": {
+                    "type": "string",
+                    "description": "Inbound bind address; empty binds every interface."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "Public port; defaults to 443."
+                  },
+                  "remark": {
+                    "type": "string",
+                    "description": "Inbound remark; defaults from the port."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Inbound tag; defaults from the port."
+                  }
+                },
+                "required": [
+                  "domain",
+                  "listen",
+                  "port",
+                  "remark",
+                  "tag"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "inboundId": {
+                          "type": "integer"
+                        },
+                        "tag": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        },
+                        "dest": {
+                          "type": "string"
+                        },
+                        "xver": {
+                          "type": "integer"
+                        },
+                        "publicKey": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/firewall/status": {
+      "get": {
+        "tags": [
+          "Firewall"
+        ],
+        "summary": "Whether the panel ruleset is loaded, which table it owns, the SSH port and management flag it is using, the TCP and UDP ports it allows, and whether a rollback is still pending.",
+        "operationId": "get_panel_api_firewall_status",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "loaded": {
+                          "type": "boolean"
+                        },
+                        "table": {
+                          "type": "string"
+                        },
+                        "sshPort": {
+                          "type": "integer"
+                        },
+                        "manageSsh": {
+                          "type": "boolean"
+                        },
+                        "allowedTcp": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        },
+                        "allowedUdp": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        },
+                        "pendingRollback": {
+                          "type": "boolean"
+                        },
+                        "rollbackId": {
+                          "type": "string"
+                        },
+                        "rollbackDeadline": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/firewall/config": {
+      "get": {
+        "tags": [
+          "Firewall"
+        ],
+        "summary": "The exact nftables ruleset apply would load, byte for byte.",
+        "operationId": "get_panel_api_firewall_config",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "config": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/firewall/apply": {
+      "post": {
+        "tags": [
+          "Firewall"
+        ],
+        "summary": "Render, validate with `nft -c`, snapshot the current ruleset, load, then arm a rollback that fires unless confirmed within the given window. Refused with no window, and refused outright when the policy would not keep SSH reachable; a ruleset nft rejects never touches the live firewall.",
+        "operationId": "post_panel_api_firewall_apply",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmInSeconds": {
+                    "type": "integer",
+                    "description": "Rollback window. Required and must be positive: without it there is no way back."
+                  }
+                },
+                "required": [
+                  "confirmInSeconds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "deadlineId": {
+                          "type": "string"
+                        },
+                        "confirmInSeconds": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/firewall/confirm": {
+      "post": {
+        "tags": [
+          "Firewall"
+        ],
+        "summary": "Retire the pending rollback once the operator has verified the panel and SSH still answer. A stale or foreign deadline id is refused, so an old confirmation cannot disarm a newer apply.",
+        "operationId": "post_panel_api_firewall_confirm",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deadlineId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The id returned by apply."
+                  }
+                },
+                "required": [
+                  "deadlineId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/edge/install-nginx": {
+      "post": {
+        "tags": [
+          "Firewall"
+        ],
+        "summary": "Install the nginx binary through the distribution package manager, then stop and disable the packaged unit so its default site does not claim port 80. Refused inside a container (the package would vanish with it) and without root, with the reason returned; an existing binary is left untouched. This is what makes the perimeter usable without an install-time flag.",
+        "operationId": "post_panel_api_edge_install_nginx",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "alreadyInstalled": {
+                          "type": "boolean"
+                        },
+                        "packageManager": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "bin": {
+                          "type": "string"
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/front/certs": {
+      "get": {
+        "tags": [
+          "Front Certificates"
+        ],
+        "summary": "List every stored certificate, oldest first, with its domains, issuer and expiry.",
+        "operationId": "get_panel_api_front_certs",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FrontCert"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "acmeEmail": "admin@example.com",
+                      "certPath": "/etc/x-ui/front/certs/panel.crt",
+                      "createdAt": "2026-01-02T15:04:05Z",
+                      "domains": "panel.example.com",
+                      "id": 1,
+                      "issuer": "acme",
+                      "keyPath": "/etc/x-ui/front/certs/panel.key",
+                      "lastAttempt": "2026-01-02T15:04:05Z",
+                      "lastError": "",
+                      "mode": "file",
+                      "nextAttempt": "2026-03-02T15:04:05Z",
+                      "notAfter": "2026-04-02T15:04:05Z",
+                      "updatedAt": "2026-01-02T15:04:05Z"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Front Certificates"
+        ],
+        "summary": "Create or update a certificate. The pair is loaded before it is stored, so a path that does not hold a matching certificate and key is rejected and nothing is written; the expiry is read from the leaf. Omit id, or pass 0, to create.",
+        "operationId": "post_panel_api_front_certs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "description": "Existing row to update; 0 or omitted creates."
+                  },
+                  "domains": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Comma- or space-separated server names this certificate covers, wildcards allowed."
+                  },
+                  "certPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path to the PEM certificate chain."
+                  },
+                  "keyPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path to the PEM private key."
+                  },
+                  "issuer": {
+                    "type": "string",
+                    "description": "file for an operator-supplied pair."
+                  },
+                  "acmeEmail": {
+                    "type": "string",
+                    "description": "Account contact when the pair was issued by ACME."
+                  }
+                },
+                "required": [
+                  "id",
+                  "domains",
+                  "certPath",
+                  "keyPath",
+                  "issuer",
+                  "acmeEmail"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/FrontCert"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "acmeEmail": "admin@example.com",
+                    "certPath": "/etc/x-ui/front/certs/panel.crt",
+                    "createdAt": "2026-01-02T15:04:05Z",
+                    "domains": "panel.example.com",
+                    "id": 1,
+                    "issuer": "acme",
+                    "keyPath": "/etc/x-ui/front/certs/panel.key",
+                    "lastAttempt": "2026-01-02T15:04:05Z",
+                    "lastError": "",
+                    "mode": "file",
+                    "nextAttempt": "2026-03-02T15:04:05Z",
+                    "notAfter": "2026-04-02T15:04:05Z",
+                    "updatedAt": "2026-01-02T15:04:05Z"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/front/certs/{id}/delete": {
+      "post": {
+        "tags": [
+          "Front Certificates"
+        ],
+        "summary": "Remove a certificate row and stop serving its domains from the next reload.",
+        "operationId": "post_panel_api_front_certs_id_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Front certificate id.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/FrontCert"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "acmeEmail": "admin@example.com",
+                    "certPath": "/etc/x-ui/front/certs/panel.crt",
+                    "createdAt": "2026-01-02T15:04:05Z",
+                    "domains": "panel.example.com",
+                    "id": 1,
+                    "issuer": "acme",
+                    "keyPath": "/etc/x-ui/front/certs/panel.key",
+                    "lastAttempt": "2026-01-02T15:04:05Z",
+                    "lastError": "",
+                    "mode": "file",
+                    "nextAttempt": "2026-03-02T15:04:05Z",
+                    "notAfter": "2026-04-02T15:04:05Z",
+                    "updatedAt": "2026-01-02T15:04:05Z"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/front/certs/reload": {
+      "post": {
+        "tags": [
+          "Front Certificates"
+        ],
+        "summary": "Re-read every certificate pair from disk and report what the perimeter now holds, per domain, including the default presented to clients that send no SNI. Warns explicitly when nothing is loadable, because a perimeter without a certificate cannot complete a handshake.",
+        "operationId": "post_panel_api_front_certs_reload",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "object",
+                      "properties": {
+                        "hasCertificate": {
+                          "type": "boolean"
+                        },
+                        "warning": {
+                          "type": "string"
+                        },
+                        "certificates": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "domains": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "mode": {
+                                "type": "string"
+                              },
+                              "issuer": {
+                                "type": "string"
+                              },
+                              "notAfter": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "loaded": {
+                                "type": "boolean"
+                              },
+                              "error": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "default": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "domains": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "notAfter": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }

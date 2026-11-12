@@ -13,6 +13,77 @@
   margin-left: auto;
 }
 
+/* The level controls wrap onto their own line: the operator must not read the
+   panel level as "just another view filter" sitting beside the view level. */
+.log-level-form {
+  margin-top: 4px;
+}
+
+.log-level-form .ant-form-item {
+  margin-bottom: 8px;
+}
+
+.log-level-error,
+.log-sources-divider {
+  margin-top: 8px;
+}
+
+.log-error-detail {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.log-sources-hint {
+  margin-bottom: 4px !important;
+}
+
+.log-source-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ant-color-split);
+}
+
+.log-source-row:last-child {
+  border-bottom: 0;
+}
+
+.log-source-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.log-source-name {
+  font-weight: 600;
+}
+
+.log-source-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-source-size {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
 .log-container {
   --log-stamp: #3c89e8;
   --log-debug: #3c89e8;

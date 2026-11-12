@@ -4,6 +4,7 @@
   "pages": [
     "panel",
     "ssl-certificates",
+    "edge",
     "inbounds",
     "reality",
     "amneziawg",

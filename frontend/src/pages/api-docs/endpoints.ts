@@ -832,6 +832,67 @@ export const sections: readonly Section[] = [
           '{\n  "success": true,\n  "obj": [\n    "2025/01/01 12:00:00 [INFO] Server started",\n    "2025/01/01 12:00:01 [INFO] Xray is running"\n  ]\n}',
       },
       {
+        method: 'GET',
+        path: '/panel/api/server/logs/sources',
+        summary:
+          'List the log files this panel can hand out — its own log plus the nginx perimeter\u2019s access and error logs — with each file\u2019s path, size, and whether it exists. A perimeter log that is missing means nginx never wrote one, which is itself the diagnosis.',
+        responseObjectSchema: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', enum: ['app', 'edge-access', 'edge-error'] },
+              path: { type: 'string' },
+              exists: { type: 'boolean' },
+              size: { type: 'integer' },
+            },
+          },
+        },
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/server/logs/export',
+        summary:
+          'Download the tail of one log file as an attachment. Tailing rather than shipping the whole file keeps a rotated multi-megabyte log from filling the response. The panel log is always written at debug level, so nothing has to be enabled for it to be useful; a source that does not exist yet returns an error rather than an empty file.',
+        params: [
+          {
+            name: 'source',
+            in: 'query',
+            type: 'string',
+            desc: 'app (panel log), edge-access or edge-error (nginx perimeter).',
+            enum: ['app', 'edge-access', 'edge-error'],
+            defaultValue: 'app',
+          },
+          {
+            name: 'lines',
+            in: 'query',
+            type: 'number',
+            desc: 'How many trailing lines to return; capped at 50000.',
+            defaultValue: 5000,
+          },
+        ],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/logLevel',
+        summary:
+          'Set the panel\u2019s log level and apply it to the running process. This controls console/syslog verbosity only: the file log always records at debug, so lowering it does not lose detail in a later download.',
+        body: '{"level":"debug"}',
+        params: [
+          {
+            name: 'level',
+            in: 'body',
+            type: 'string',
+            desc: 'One of debug, info, notice, warning, error.',
+            enum: ['debug', 'info', 'notice', 'warning', 'error'],
+          },
+        ],
+        responseObjectSchema: {
+          type: 'object',
+          properties: { level: { type: 'string' } },
+        },
+      },
+      {
         method: 'POST',
         path: '/panel/api/server/xraylogs/:count',
         summary: 'Return the last N lines of the Xray process log.',
@@ -2948,6 +3009,338 @@ export const sections: readonly Section[] = [
           'Delete a chain selector by id (POST alias of DELETE for clients that cannot send DELETE).',
         params: [{ name: 'id', in: 'path', type: 'integer', desc: 'Chain selector id.' }],
         responseSchema: 'ChainSelector',
+      },
+    ],
+  },
+
+  {
+    id: 'front-sites',
+    title: 'Front Sites',
+    description:
+      'Decoy websites the nginx perimeter serves: what a visitor, a scanner or a probe sees when the request is not for the panel. Each site is one uploaded .zip, extracted under the panel folder; the database holds metadata only, so a panel backup never carries a whole website. At most one site is active, and that is the document an unauthenticated visitor sees.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/front/sites',
+        summary:
+          'List every stored site, oldest first, with its size, file count and archive hash.',
+        responseSchema: 'FrontSite',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/front/sites/upload',
+        summary:
+          'Upload a zipped site. The archive is validated before anything is written: an entry that escapes the site directory (absolute, .., backslash or drive letter), a symlink or special file, more than 5000 entries, a path deeper than 16 levels, or more than 128 MiB of uncompressed data rejects the whole upload and leaves no directory behind. One wrapping top-level folder is stripped, and index.html (else the only .html file) becomes the entry document.',
+        params: [
+          {
+            name: 'file',
+            in: 'body (multipart)',
+            type: 'file',
+            desc: 'The site as a .zip archive.',
+          },
+          {
+            name: 'name',
+            in: 'body (multipart)',
+            type: 'string',
+            desc: 'Unique display name for the site.',
+            minLength: 1,
+          },
+        ],
+        responseSchema: 'FrontSite',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/front/sites/:id/activate',
+        summary:
+          'Make this site the one the perimeter serves, clearing the active flag from every other site in the same transaction.',
+        params: [{ name: 'id', in: 'path', type: 'integer', desc: 'Front site id.' }],
+        responseSchema: 'FrontSite',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/front/sites/:id/delete',
+        summary:
+          'Delete a site and its files. The active site is refused: activate another site first.',
+        params: [{ name: 'id', in: 'path', type: 'integer', desc: 'Front site id.' }],
+        responseSchema: 'FrontSite',
+      },
+    ],
+  },
+
+  {
+    id: 'edge',
+    title: 'Nginx Perimeter',
+    description:
+      'The nginx instance the panel generates and drives: it sits behind the REALITY fallback, terminates TLS with the real certificate, serves the decoy site to everyone, and proxies the panel and the subscription on their secret paths. The panel owns the whole config file, so its state is regenerated from settings rather than read from disk.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/edge/status',
+        summary:
+          'Whether the perimeter is enabled, whether it answers on its listen address, whether the config it would generate is complete, which names it serves, and the expiry of the certificate behind it. Read-only: it never starts or reloads anything.',
+        responseSchema: 'EdgeStatus',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/edge/config',
+        summary:
+          'The exact nginx configuration text that apply would write, so it can be compared against what the running perimeter actually loaded.',
+        responseObjectSchema: {
+          type: 'object',
+          properties: { config: { type: 'string' } },
+        },
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/edge/apply',
+        summary:
+          'Render, validate and activate the perimeter. The generated config is written first and checked with `nginx -t`; only a config nginx accepts is loaded, so a bad setting cannot take the perimeter down. Starts nginx when it is stopped and reloads it otherwise.',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/edge/stop',
+        summary: 'Stop the perimeter gracefully, letting in-flight requests finish.',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/edge/preset',
+        summary:
+          'Build the whole single-port arrangement in one call: a VLESS+REALITY inbound on the public port whose fallback is the perimeter, with generated REALITY keys, the domain as its server name, and `xver` matching the perimeter PROXY-protocol setting. The perimeter must be enabled first, because REALITY needs a fallback that answers like a real site; the domain is also written to edgeServerNames so the certificate and the advertised server name cannot drift apart.',
+        params: [
+          {
+            name: 'domain',
+            in: 'body',
+            type: 'string',
+            desc: 'The certificate name and the REALITY server name; also written to edgeServerNames.',
+            minLength: 1,
+          },
+          {
+            name: 'listen',
+            in: 'body',
+            type: 'string',
+            desc: 'Inbound bind address; empty binds every interface.',
+          },
+          { name: 'port', in: 'body', type: 'integer', desc: 'Public port; defaults to 443.' },
+          {
+            name: 'remark',
+            in: 'body',
+            type: 'string',
+            desc: 'Inbound remark; defaults from the port.',
+          },
+          { name: 'tag', in: 'body', type: 'string', desc: 'Inbound tag; defaults from the port.' },
+        ],
+        responseObjectSchema: {
+          type: 'object',
+          properties: {
+            inboundId: { type: 'integer' },
+            tag: { type: 'string' },
+            domain: { type: 'string' },
+            dest: { type: 'string' },
+            xver: { type: 'integer' },
+            publicKey: { type: 'string' },
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'firewall',
+    title: 'Firewall',
+    description:
+      'The host firewall the panel renders and loads: an nftables table of its own, input policy drop, with only loopback, established traffic, ICMP, the SSH port and the public TLS port accepted. It replaces only its own table, so Docker and fail2ban rules are untouched. Apply cannot lock the operator out: it refuses without a confirmation window, and restores the previous ruleset if that window passes unconfirmed, including across a panel restart.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/firewall/status',
+        summary:
+          'Whether the panel ruleset is loaded, which table it owns, the SSH port and management flag it is using, the TCP and UDP ports it allows, and whether a rollback is still pending.',
+        responseObjectSchema: {
+          type: 'object',
+          properties: {
+            loaded: { type: 'boolean' },
+            table: { type: 'string' },
+            sshPort: { type: 'integer' },
+            manageSsh: { type: 'boolean' },
+            allowedTcp: { type: 'array', items: { type: 'integer' } },
+            allowedUdp: { type: 'array', items: { type: 'integer' } },
+            pendingRollback: { type: 'boolean' },
+            rollbackId: { type: 'string' },
+            rollbackDeadline: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/firewall/config',
+        summary: 'The exact nftables ruleset apply would load, byte for byte.',
+        responseObjectSchema: {
+          type: 'object',
+          properties: { config: { type: 'string' } },
+        },
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/firewall/apply',
+        summary:
+          'Render, validate with `nft -c`, snapshot the current ruleset, load, then arm a rollback that fires unless confirmed within the given window. Refused with no window, and refused outright when the policy would not keep SSH reachable; a ruleset nft rejects never touches the live firewall.',
+        params: [
+          {
+            name: 'confirmInSeconds',
+            in: 'body',
+            type: 'integer',
+            desc: 'Rollback window. Required and must be positive: without it there is no way back.',
+          },
+        ],
+        responseObjectSchema: {
+          type: 'object',
+          properties: {
+            deadlineId: { type: 'string' },
+            confirmInSeconds: { type: 'integer' },
+          },
+        },
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/firewall/confirm',
+        summary:
+          'Retire the pending rollback once the operator has verified the panel and SSH still answer. A stale or foreign deadline id is refused, so an old confirmation cannot disarm a newer apply.',
+        params: [
+          {
+            name: 'deadlineId',
+            in: 'body',
+            type: 'string',
+            desc: 'The id returned by apply.',
+            minLength: 1,
+          },
+        ],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/edge/install-nginx',
+        summary:
+          'Install the nginx binary through the distribution package manager, then stop and disable the packaged unit so its default site does not claim port 80. Refused inside a container (the package would vanish with it) and without root, with the reason returned; an existing binary is left untouched. This is what makes the perimeter usable without an install-time flag.',
+        responseObjectSchema: {
+          type: 'object',
+          properties: {
+            alreadyInstalled: { type: 'boolean' },
+            packageManager: { type: 'string' },
+            version: { type: 'string' },
+            bin: { type: 'string' },
+            steps: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'front-certs',
+    title: 'Front Certificates',
+    description:
+      'The TLS certificates the perimeter presents, keyed by the server names they cover. Private keys stay on disk: only their paths are stored and returned. A replaced pair is picked up without restarting the panel, and a pair that fails to load keeps the last working material instead of taking the site down.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/front/certs',
+        summary:
+          'List every stored certificate, oldest first, with its domains, issuer and expiry.',
+        responseSchema: 'FrontCert',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/front/certs',
+        summary:
+          'Create or update a certificate. The pair is loaded before it is stored, so a path that does not hold a matching certificate and key is rejected and nothing is written; the expiry is read from the leaf. Omit id, or pass 0, to create.',
+        params: [
+          {
+            name: 'id',
+            in: 'body',
+            type: 'integer',
+            desc: 'Existing row to update; 0 or omitted creates.',
+          },
+          {
+            name: 'domains',
+            in: 'body',
+            type: 'string',
+            desc: 'Comma- or space-separated server names this certificate covers, wildcards allowed.',
+            minLength: 1,
+          },
+          {
+            name: 'certPath',
+            in: 'body',
+            type: 'string',
+            desc: 'Path to the PEM certificate chain.',
+            minLength: 1,
+          },
+          {
+            name: 'keyPath',
+            in: 'body',
+            type: 'string',
+            desc: 'Path to the PEM private key.',
+            minLength: 1,
+          },
+          {
+            name: 'issuer',
+            in: 'body',
+            type: 'string',
+            desc: 'file for an operator-supplied pair.',
+          },
+          {
+            name: 'acmeEmail',
+            in: 'body',
+            type: 'string',
+            desc: 'Account contact when the pair was issued by ACME.',
+          },
+        ],
+        responseSchema: 'FrontCert',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/front/certs/:id/delete',
+        summary: 'Remove a certificate row and stop serving its domains from the next reload.',
+        params: [{ name: 'id', in: 'path', type: 'integer', desc: 'Front certificate id.' }],
+        responseSchema: 'FrontCert',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/front/certs/reload',
+        summary:
+          'Re-read every certificate pair from disk and report what the perimeter now holds, per domain, including the default presented to clients that send no SNI. Warns explicitly when nothing is loadable, because a perimeter without a certificate cannot complete a handshake.',
+        responseObjectSchema: {
+          type: 'object',
+          properties: {
+            hasCertificate: { type: 'boolean' },
+            warning: { type: 'string' },
+            certificates: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  domains: { type: 'array', items: { type: 'string' } },
+                  mode: { type: 'string' },
+                  issuer: { type: 'string' },
+                  notAfter: { type: 'string', nullable: true },
+                  loaded: { type: 'boolean' },
+                  error: { type: 'string' },
+                },
+              },
+            },
+            default: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'integer' },
+                domains: { type: 'array', items: { type: 'string' } },
+                notAfter: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
       },
     ],
   },

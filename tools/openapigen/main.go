@@ -42,6 +42,8 @@ func run(root, outDir string) error {
 				"SubBalancer",
 				"ChainProxy",
 				"ChainSelector",
+				"FrontSite",
+				"FrontCert",
 			),
 			AliasAllow: setOf("Protocol"),
 			Overrides: map[string][]walkOverride{
@@ -73,6 +75,7 @@ func run(root, outDir string) error {
 				"AllSetting",
 				"AllSettingView",
 				"HostGroup",
+				"EdgeStatus",
 			),
 		},
 		{

@@ -1,0 +1,79 @@
+---
+title: Nginx Perimeter
+description: 'The nginx instance the panel generates and drives: it sits behind
+  the REALITY fallback, terminates TLS with the real certificate, serves the
+  decoy site to everyone, and proxies the panel and the subscription on their
+  secret paths. The panel owns the whole config file, so its state is
+  regenerated from settings rather than read from disk.'
+full: true
+_openapi:
+  preload:
+    - ./public/openapi.json
+  toc:
+    - depth: 2
+      title: 'Whether the perimeter is enabled, whether it answers on its listen
+        address, whether the config it would generate is complete, which names
+        it serves, and the expiry of the certificate behind it. Read-only: it
+        never starts or reloads anything.'
+      url: '#whether-the-perimeter-is-enabled-whether-it-answers-on-its-listen-address-whether-the-config-it-would-generate-is-complete-which-names-it-serves-and-the-expiry-of-the-certificate-behind-it-read-only-it-never-starts-or-reloads-anything'
+    - depth: 2
+      title: The exact nginx configuration text that apply would write, so it can be
+        compared against what the running perimeter actually loaded.
+      url: '#the-exact-nginx-configuration-text-that-apply-would-write-so-it-can-be-compared-against-what-the-running-perimeter-actually-loaded'
+    - depth: 2
+      title: Render, validate and activate the perimeter. The generated config is
+        written first and checked with `nginx -t`; only a config nginx accepts
+        is loaded, so a bad setting cannot take the perimeter down. Starts nginx
+        when it is stopped and reloads it otherwise.
+      url: '#render-validate-and-activate-the-perimeter-the-generated-config-is-written-first-and-checked-with-nginx--t-only-a-config-nginx-accepts-is-loaded-so-a-bad-setting-cannot-take-the-perimeter-down-starts-nginx-when-it-is-stopped-and-reloads-it-otherwise'
+    - depth: 2
+      title: Stop the perimeter gracefully, letting in-flight requests finish.
+      url: '#stop-the-perimeter-gracefully-letting-in-flight-requests-finish'
+    - depth: 2
+      title: 'Build the whole single-port arrangement in one call: a VLESS+REALITY
+        inbound on the public port whose fallback is the perimeter, with
+        generated REALITY keys, the domain as its server name, and `xver`
+        matching the perimeter PROXY-protocol setting. The perimeter must be
+        enabled first, because REALITY needs a fallback that answers like a real
+        site; the domain is also written to edgeServerNames so the certificate
+        and the advertised server name cannot drift apart.'
+      url: '#build-the-whole-single-port-arrangement-in-one-call-a-vlessreality-inbound-on-the-public-port-whose-fallback-is-the-perimeter-with-generated-reality-keys-the-domain-as-its-server-name-and-xver-matching-the-perimeter-proxy-protocol-setting-the-perimeter-must-be-enabled-first-because-reality-needs-a-fallback-that-answers-like-a-real-site-the-domain-is-also-written-to-edgeservernames-so-the-certificate-and-the-advertised-server-name-cannot-drift-apart'
+  structuredData:
+    headings:
+      - content: 'Whether the perimeter is enabled, whether it answers on its listen
+          address, whether the config it would generate is complete, which names
+          it serves, and the expiry of the certificate behind it. Read-only: it
+          never starts or reloads anything.'
+        id: whether-the-perimeter-is-enabled-whether-it-answers-on-its-listen-address-whether-the-config-it-would-generate-is-complete-which-names-it-serves-and-the-expiry-of-the-certificate-behind-it-read-only-it-never-starts-or-reloads-anything
+      - content: The exact nginx configuration text that apply would write, so it can be
+          compared against what the running perimeter actually loaded.
+        id: the-exact-nginx-configuration-text-that-apply-would-write-so-it-can-be-compared-against-what-the-running-perimeter-actually-loaded
+      - content: Render, validate and activate the perimeter. The generated config is
+          written first and checked with `nginx -t`; only a config nginx accepts
+          is loaded, so a bad setting cannot take the perimeter down. Starts
+          nginx when it is stopped and reloads it otherwise.
+        id: render-validate-and-activate-the-perimeter-the-generated-config-is-written-first-and-checked-with-nginx--t-only-a-config-nginx-accepts-is-loaded-so-a-bad-setting-cannot-take-the-perimeter-down-starts-nginx-when-it-is-stopped-and-reloads-it-otherwise
+      - content: Stop the perimeter gracefully, letting in-flight requests finish.
+        id: stop-the-perimeter-gracefully-letting-in-flight-requests-finish
+      - content: 'Build the whole single-port arrangement in one call: a VLESS+REALITY
+          inbound on the public port whose fallback is the perimeter, with
+          generated REALITY keys, the domain as its server name, and `xver`
+          matching the perimeter PROXY-protocol setting. The perimeter must be
+          enabled first, because REALITY needs a fallback that answers like a
+          real site; the domain is also written to edgeServerNames so the
+          certificate and the advertised server name cannot drift apart.'
+        id: build-the-whole-single-port-arrangement-in-one-call-a-vlessreality-inbound-on-the-public-port-whose-fallback-is-the-perimeter-with-generated-reality-keys-the-domain-as-its-server-name-and-xver-matching-the-perimeter-proxy-protocol-setting-the-perimeter-must-be-enabled-first-because-reality-needs-a-fallback-that-answers-like-a-real-site-the-domain-is-also-written-to-edgeservernames-so-the-certificate-and-the-advertised-server-name-cannot-drift-apart
+    contents: []
+---
+
+{/* This file was generated by Fumadocs. Do not edit this file directly. Any changes should be made by running the generation command again. */}
+
+export default function Layout(props) {
+  const { OpenAPIPage } = props.components ?? {};
+  return (
+    <>
+      {props.children}
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/edge/status","method":"get"},{"path":"/panel/api/edge/config","method":"get"},{"path":"/panel/api/edge/apply","method":"post"},{"path":"/panel/api/edge/stop","method":"post"},{"path":"/panel/api/edge/preset","method":"post"}]} showTitle />
+    </>
+  );
+}

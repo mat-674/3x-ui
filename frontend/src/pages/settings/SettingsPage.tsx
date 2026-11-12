@@ -25,6 +25,9 @@ import { AllSettingSchema } from '@/schemas/setting';
 import AppSidebar from '@/layouts/AppSidebar';
 import GeneralTab from './GeneralTab';
 import SecurityTab from './SecurityTab';
+import FrontTab from './FrontTab';
+import EdgeTab from './EdgeTab';
+import FirewallTab from './FirewallTab';
 import TelegramTab from './TelegramTab';
 import EmailTab from './EmailTab';
 import DiscordTab from './DiscordTab';
@@ -41,6 +44,9 @@ interface ApiMsg {
 const tabSlugs = [
   'general',
   'security',
+  'front',
+  'edge',
+  'firewall',
   'telegram',
   'email',
   'discord',
@@ -212,6 +218,24 @@ export default function SettingsPage() {
       case 'security':
         return (
           <SecurityTab
+            allSetting={allSetting}
+            updateSetting={updateSetting}
+            saveSetting={savePayload}
+          />
+        );
+      case 'front':
+        return <FrontTab allSetting={allSetting} updateSetting={updateSetting} />;
+      case 'edge':
+        return (
+          <EdgeTab
+            allSetting={allSetting}
+            updateSetting={updateSetting}
+            saveSetting={savePayload}
+          />
+        );
+      case 'firewall':
+        return (
+          <FirewallTab
             allSetting={allSetting}
             updateSetting={updateSetting}
             saveSetting={savePayload}

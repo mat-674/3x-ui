@@ -114,6 +114,9 @@ func runWebServer() {
 	if err != nil {
 		log.Fatalf("Error initializing database: %v", err)
 	}
+	// The panel's own log level wins over XUI_LOG_LEVEL once the database is open,
+	// so a level chosen in the UI survives a restart instead of reverting.
+	service.ApplyStoredLogLevel()
 	// Created here, not in InitDB: a CLI call's output is often piped away, and
 	// this log is the one place an operator reads the first login from.
 	username, password, err := database.EnsureFirstUser()
@@ -550,6 +553,69 @@ func GetApiToken(getApiToken bool, tokenName, tokenScope string) {
 	fmt.Println("apiToken:", created.Token)
 }
 
+// runEdgeCommand drives the nginx perimeter from the command line, so the
+// installer and an acme.sh --reloadcmd hook can apply a renewed certificate
+// without going through the panel UI.
+func runEdgeCommand(args []string) {
+	logger.InitLogger(logging.INFO)
+	if err := database.InitDB(config.GetDBPath()); err != nil {
+		log.Fatal(err)
+	}
+	settingService := service.SettingService{}
+
+	action := "status"
+	if len(args) > 0 {
+		action = args[0]
+	}
+	switch action {
+	case "apply":
+		if err := settingService.ApplyEdge(context.Background()); err != nil {
+			fmt.Println("edge apply failed:", err)
+			os.Exit(1)
+		}
+		fmt.Println("nginx perimeter applied")
+	case "config":
+		text, err := settingService.PreviewEdgeConfig()
+		if err != nil {
+			fmt.Println("edge config failed:", err)
+			os.Exit(1)
+		}
+		fmt.Print(text)
+	case "install-nginx":
+		report, err := settingService.InstallEdgeNginx(context.Background())
+		if err != nil {
+			fmt.Println("edge install-nginx failed:", err)
+			os.Exit(1)
+		}
+		if report.AlreadyInstalled {
+			fmt.Printf("nginx is already installed at %s (%s)\n", report.Bin, report.Version)
+			return
+		}
+		fmt.Printf("nginx installed via %s at %s (%s)\n", report.PackageManager, report.Bin, report.Version)
+		for _, step := range report.Steps {
+			fmt.Println(step)
+		}
+	case "status":
+		status, err := settingService.EdgeStatus()
+		if err != nil {
+			fmt.Println("edge status failed:", err)
+			os.Exit(1)
+		}
+		fmt.Printf("enabled=%v running=%v configValid=%v listen=%s:%d panel=%s",
+			status.Enabled, status.Running, status.ConfigValid, status.Listen, status.Port, status.PanelUpstream)
+		if len(status.ServerNames) > 0 {
+			fmt.Printf(" names=%s", strings.Join(status.ServerNames, ","))
+		}
+		if status.Message != "" {
+			fmt.Printf(" message=%q", status.Message)
+		}
+		fmt.Println()
+	default:
+		fmt.Println("usage: x-ui edge [apply|config|status|install-nginx]")
+		os.Exit(1)
+	}
+}
+
 // migrateDb performs database migration operations for the 3x-ui panel.
 func migrateDb() {
 	inboundService := service.InboundService{}
@@ -673,6 +739,8 @@ func main() {
 		migrateDb()
 	case "encrypt-tokens":
 		encryptNodeTokens()
+	case "edge":
+		runEdgeCommand(os.Args[2:])
 	case "migrate-db":
 		if err := migrateDbCmd.Parse(os.Args[2:]); err != nil {
 			fmt.Println(err)

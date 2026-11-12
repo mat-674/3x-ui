@@ -39,6 +39,33 @@ export const SCHEMAS: Record<string, unknown> = {
       "discordRunTime": {
         "type": "string"
       },
+      "edgeCertFile": {
+        "type": "string"
+      },
+      "edgeEnable": {
+        "description": "nginx perimeter behind the REALITY fallback.",
+        "type": "boolean"
+      },
+      "edgeKeyFile": {
+        "type": "string"
+      },
+      "edgeListen": {
+        "type": "string"
+      },
+      "edgeNginxBin": {
+        "type": "string"
+      },
+      "edgePort": {
+        "maximum": 65535,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "edgeProxyProtocol": {
+        "type": "boolean"
+      },
+      "edgeServerNames": {
+        "type": "string"
+      },
       "expireDiff": {
         "minimum": 0,
         "type": "integer"
@@ -51,6 +78,26 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "externalTrafficInformURI": {
         "type": "string"
+      },
+      "firewallAllow": {
+        "type": "string"
+      },
+      "firewallManageSSH": {
+        "type": "boolean"
+      },
+      "firewallNftBin": {
+        "type": "string"
+      },
+      "firewallSSHPort": {
+        "description": "nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the\nfirewall untouched.",
+        "maximum": 65535,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "frontSiteId": {
+        "description": "Decoy site the perimeter proxy serves; 0 means none selected.",
+        "minimum": 0,
+        "type": "integer"
       },
       "happLinkEnable": {
         "type": "boolean"
@@ -126,6 +173,17 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapVlessField": {
         "type": "string"
       },
+      "logLevel": {
+        "enum": [
+          "debug",
+          "info",
+          "notice",
+          "warning",
+          "error"
+        ],
+        "example": "info",
+        "type": "string"
+      },
       "nodeDownThreshold": {
         "maximum": 100,
         "minimum": 1,
@@ -140,6 +198,9 @@ export const SCHEMAS: Record<string, unknown> = {
         "maximum": 1000,
         "minimum": 0,
         "type": "integer"
+      },
+      "panelCookieName": {
+        "type": "string"
       },
       "panelOutbound": {
         "type": "string"
@@ -595,10 +656,23 @@ export const SCHEMAS: Record<string, unknown> = {
       "discordLang",
       "discordMemory",
       "discordRunTime",
+      "edgeCertFile",
+      "edgeEnable",
+      "edgeKeyFile",
+      "edgeListen",
+      "edgeNginxBin",
+      "edgePort",
+      "edgeProxyProtocol",
+      "edgeServerNames",
       "expireDiff",
       "externalSubUserAgent",
       "externalTrafficInformEnable",
       "externalTrafficInformURI",
+      "firewallAllow",
+      "firewallManageSSH",
+      "firewallNftBin",
+      "firewallSSHPort",
+      "frontSiteId",
       "happLinkEnable",
       "ipLimitAllowlist",
       "ldapAutoCreate",
@@ -622,9 +696,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapUserAttr",
       "ldapUserFilter",
       "ldapVlessField",
+      "logLevel",
       "nodeDownThreshold",
       "outboundDownThreshold",
       "pageSize",
+      "panelCookieName",
       "panelOutbound",
       "realityScanCandidates",
       "remarkTemplate",
@@ -806,6 +882,33 @@ export const SCHEMAS: Record<string, unknown> = {
       "discordRunTime": {
         "type": "string"
       },
+      "edgeCertFile": {
+        "type": "string"
+      },
+      "edgeEnable": {
+        "description": "nginx perimeter behind the REALITY fallback.",
+        "type": "boolean"
+      },
+      "edgeKeyFile": {
+        "type": "string"
+      },
+      "edgeListen": {
+        "type": "string"
+      },
+      "edgeNginxBin": {
+        "type": "string"
+      },
+      "edgePort": {
+        "maximum": 65535,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "edgeProxyProtocol": {
+        "type": "boolean"
+      },
+      "edgeServerNames": {
+        "type": "string"
+      },
       "expireDiff": {
         "minimum": 0,
         "type": "integer"
@@ -818,6 +921,26 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "externalTrafficInformURI": {
         "type": "string"
+      },
+      "firewallAllow": {
+        "type": "string"
+      },
+      "firewallManageSSH": {
+        "type": "boolean"
+      },
+      "firewallNftBin": {
+        "type": "string"
+      },
+      "firewallSSHPort": {
+        "description": "nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the\nfirewall untouched.",
+        "maximum": 65535,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "frontSiteId": {
+        "description": "Decoy site the perimeter proxy serves; 0 means none selected.",
+        "minimum": 0,
+        "type": "integer"
       },
       "happLinkEnable": {
         "type": "boolean"
@@ -917,6 +1040,17 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapVlessField": {
         "type": "string"
       },
+      "logLevel": {
+        "enum": [
+          "debug",
+          "info",
+          "notice",
+          "warning",
+          "error"
+        ],
+        "example": "info",
+        "type": "string"
+      },
       "nodeDownThreshold": {
         "maximum": 100,
         "minimum": 1,
@@ -931,6 +1065,9 @@ export const SCHEMAS: Record<string, unknown> = {
         "maximum": 1000,
         "minimum": 0,
         "type": "integer"
+      },
+      "panelCookieName": {
+        "type": "string"
       },
       "panelOutbound": {
         "type": "string"
@@ -1386,10 +1523,23 @@ export const SCHEMAS: Record<string, unknown> = {
       "discordLang",
       "discordMemory",
       "discordRunTime",
+      "edgeCertFile",
+      "edgeEnable",
+      "edgeKeyFile",
+      "edgeListen",
+      "edgeNginxBin",
+      "edgePort",
+      "edgeProxyProtocol",
+      "edgeServerNames",
       "expireDiff",
       "externalSubUserAgent",
       "externalTrafficInformEnable",
       "externalTrafficInformURI",
+      "firewallAllow",
+      "firewallManageSSH",
+      "firewallNftBin",
+      "firewallSSHPort",
+      "frontSiteId",
       "happLinkEnable",
       "hasApiToken",
       "hasDiscordBotToken",
@@ -1421,9 +1571,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapUserAttr",
       "ldapUserFilter",
       "ldapVlessField",
+      "logLevel",
       "nodeDownThreshold",
       "outboundDownThreshold",
       "pageSize",
+      "panelCookieName",
       "panelOutbound",
       "realityScanCandidates",
       "remarkTemplate",
@@ -2636,6 +2788,98 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "EdgeStatus": {
+    "description": "EdgeStatus is the nginx perimeter's reported state: whether it answers, whether\nthe config the panel would generate is complete, and the certificate behind it.",
+    "properties": {
+      "certDomains": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "certNotAfter": {
+        "example": "2027-03-02T10:04:05Z",
+        "type": "string"
+      },
+      "configValid": {
+        "example": true,
+        "type": "boolean"
+      },
+      "enabled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "listen": {
+        "example": "127.0.0.1",
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "nginxBin": {
+        "example": "/usr/sbin/nginx",
+        "type": "string"
+      },
+      "nginxHint": {
+        "type": "string"
+      },
+      "nginxInstallable": {
+        "description": "NginxInstallable says whether this host can install it at all, and Hint\ncarries the reason when it cannot, so the button is never a dead end.",
+        "example": true,
+        "type": "boolean"
+      },
+      "nginxInstalled": {
+        "description": "NginxInstalled drives the install button: without the binary nothing else\non the page can work, so the UI has to know before an apply is attempted.",
+        "example": true,
+        "type": "boolean"
+      },
+      "nginxVersion": {
+        "example": "1.24.0",
+        "type": "string"
+      },
+      "panelUpstream": {
+        "example": "127.0.0.1:2053",
+        "type": "string"
+      },
+      "port": {
+        "example": 8443,
+        "type": "integer"
+      },
+      "running": {
+        "example": true,
+        "type": "boolean"
+      },
+      "serverNames": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "subPrefixes": {
+        "example": 3,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "certDomains",
+      "certNotAfter",
+      "configValid",
+      "enabled",
+      "listen",
+      "message",
+      "nginxBin",
+      "nginxHint",
+      "nginxInstallable",
+      "nginxInstalled",
+      "nginxVersion",
+      "panelUpstream",
+      "port",
+      "running",
+      "serverNames",
+      "subPrefixes"
+    ],
+    "type": "object"
+  },
   "FallbackParentInfo": {
     "description": "FallbackParentInfo carries everything the frontend needs to rewrite a\nchild inbound's client link: where to connect (the master's address\nand port) and which path matched on the master's fallbacks array.\nThe frontend already has the master inbound in its dbInbounds list,\nso we only ship identifiers + the match path here.",
     "properties": {
@@ -2648,6 +2892,139 @@ export const SCHEMAS: Record<string, unknown> = {
     },
     "required": [
       "masterId"
+    ],
+    "type": "object"
+  },
+  "FrontCert": {
+    "description": "FrontCert is one TLS certificate the front presents, keyed by the server\nnames it covers. Private keys stay on disk (0600): the rows carry paths only,\nthe same split node mTLS material uses, so keys never reach settings export.",
+    "properties": {
+      "acmeEmail": {
+        "example": "admin@example.com",
+        "type": "string"
+      },
+      "certPath": {
+        "example": "/etc/x-ui/front/certs/panel.crt",
+        "type": "string"
+      },
+      "createdAt": {
+        "example": "2026-01-02T15:04:05Z",
+        "format": "date-time",
+        "type": "string"
+      },
+      "domains": {
+        "example": "panel.example.com",
+        "type": "string"
+      },
+      "id": {
+        "example": 1,
+        "type": "integer"
+      },
+      "issuer": {
+        "description": "Issuer is \"file\" for an operator-supplied pair or \"acme\" for one this\npanel obtained; AcmeEmail is the account contact used for the latter.",
+        "example": "acme",
+        "type": "string"
+      },
+      "keyPath": {
+        "example": "/etc/x-ui/front/certs/panel.key",
+        "type": "string"
+      },
+      "lastAttempt": {
+        "example": "2026-01-02T15:04:05Z",
+        "format": "date-time",
+        "nullable": true,
+        "type": "string"
+      },
+      "lastError": {
+        "type": "string"
+      },
+      "mode": {
+        "example": "file",
+        "type": "string"
+      },
+      "nextAttempt": {
+        "example": "2026-03-02T15:04:05Z",
+        "format": "date-time",
+        "nullable": true,
+        "type": "string"
+      },
+      "notAfter": {
+        "example": "2026-04-02T15:04:05Z",
+        "format": "date-time",
+        "nullable": true,
+        "type": "string"
+      },
+      "updatedAt": {
+        "example": "2026-01-02T15:04:05Z",
+        "format": "date-time",
+        "type": "string"
+      }
+    },
+    "required": [
+      "acmeEmail",
+      "certPath",
+      "createdAt",
+      "domains",
+      "id",
+      "issuer",
+      "keyPath",
+      "lastError",
+      "mode",
+      "updatedAt"
+    ],
+    "type": "object"
+  },
+  "FrontSite": {
+    "description": "FrontSite is an uploaded decoy website served by the TLS front on the panel's\npublic port. Files live on disk under Dir; only metadata is stored here, so a\npanel backup never carries a whole website.",
+    "properties": {
+      "active": {
+        "example": true,
+        "type": "boolean"
+      },
+      "bytes": {
+        "example": 204800,
+        "format": "int64",
+        "type": "integer"
+      },
+      "createdAt": {
+        "example": "2026-01-02T15:04:05Z",
+        "format": "date-time",
+        "type": "string"
+      },
+      "dir": {
+        "example": "/etc/x-ui/front/sites/1",
+        "type": "string"
+      },
+      "entryFile": {
+        "example": "index.html",
+        "type": "string"
+      },
+      "fileCount": {
+        "example": 42,
+        "type": "integer"
+      },
+      "id": {
+        "example": 1,
+        "type": "integer"
+      },
+      "name": {
+        "example": "corporate",
+        "type": "string"
+      },
+      "sha256": {
+        "example": "9f2c...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "active",
+      "bytes",
+      "createdAt",
+      "dir",
+      "entryFile",
+      "fileCount",
+      "id",
+      "name",
+      "sha256"
     ],
     "type": "object"
   },

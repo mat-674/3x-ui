@@ -1,6 +1,7 @@
 package session
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,4 +75,55 @@ func TestSetLoginUserReplacesThePreLoginCSRFToken(t *testing.T) {
 	if planted == "" || afterLogin == "" || afterLogin == planted {
 		t.Fatalf("CSRF token before login %q, after login %q; want a fresh token", planted, afterLogin)
 	}
+}
+
+// nginx terminates TLS before the panel, so a logout reaches this listener over
+// plain HTTP on loopback; its cookie is still set over HTTPS and must say Secure.
+func TestClearSessionCookieSecureFlagFollowsThePerimeter(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(sessions.Sessions(sessionCookieName, cookie.NewStore([]byte("01234567890123456789012345678901"))))
+	router.GET("/logout", func(c *gin.Context) {
+		if err := ClearSession(c); err != nil {
+			t.Errorf("ClearSession: %v", err)
+		}
+		c.Status(http.StatusNoContent)
+	})
+	cases := []struct {
+		name       string
+		requestTLS bool
+		perimeter  bool
+		want       bool
+	}{
+		{"TLS terminated before the panel", false, true, true},
+		{"plain HTTP without the perimeter", false, false, false},
+		{"the panel terminates TLS itself", true, false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			SetSecureCookies(tc.perimeter)
+			t.Cleanup(func() { SetSecureCookies(false) })
+			req := httptest.NewRequest(http.MethodGet, "/logout", nil)
+			if tc.requestTLS {
+				req.TLS = &tls.ConnectionState{}
+			}
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			cookie := findSessionCookie(t, rec.Result().Cookies())
+			if cookie.Secure != tc.want {
+				t.Fatalf("session cookie Secure = %v, want %v", cookie.Secure, tc.want)
+			}
+		})
+	}
+}
+
+func findSessionCookie(t *testing.T, cookies []*http.Cookie) *http.Cookie {
+	t.Helper()
+	for _, cookie := range cookies {
+		if cookie.Name == SessionCookieName() {
+			return cookie
+		}
+	}
+	t.Fatalf("no %q cookie in the response", SessionCookieName())
+	return nil
 }

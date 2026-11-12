@@ -12,7 +12,10 @@ import {
   CodeOutlined,
   DatabaseOutlined,
   DiscordOutlined,
+  FireOutlined,
+  GatewayOutlined,
   GithubOutlined,
+  GlobalOutlined,
   HeartOutlined,
   LogoutOutlined,
   MailOutlined,
@@ -215,6 +218,21 @@ export default function AppSidebar() {
         key: '/settings#security',
         icon: <SafetyOutlined aria-hidden />,
         label: t('pages.settings.securitySettings'),
+      },
+      {
+        key: '/settings#front',
+        icon: <GlobalOutlined aria-hidden />,
+        label: t('pages.settings.front.title'),
+      },
+      {
+        key: '/settings#edge',
+        icon: <GatewayOutlined aria-hidden />,
+        label: t('pages.settings.edge.title'),
+      },
+      {
+        key: '/settings#firewall',
+        icon: <FireOutlined aria-hidden />,
+        label: t('pages.settings.firewall.title'),
       },
       {
         key: '/settings#telegram',

@@ -3,6 +3,7 @@ package session
 import (
 	"encoding/gob"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
@@ -14,11 +15,33 @@ import (
 )
 
 const (
-	loginUserKey      = "LOGIN_USER"
-	loginEpochKey     = "LOGIN_EPOCH"
-	apiAuthUserKey    = "api_auth_user"
-	sessionCookieName = "3x-ui"
+	loginUserKey   = "LOGIN_USER"
+	loginEpochKey  = "LOGIN_EPOCH"
+	apiAuthUserKey = "api_auth_user"
 )
+
+// sessionCookieName is variable so an operator can rename the panel cookie: a
+// cookie called "3x-ui" identifies the panel to anyone who reaches it.
+var sessionCookieName = "3x-ui"
+
+// secureCookies is set when TLS is terminated outside this process, so the panel
+// sees a plain loopback connection but must still mark cookies Secure.
+var secureCookies bool
+
+// SetSecureCookies records that every path to the panel arrives over TLS, even
+// though this listener ended up speaking plain HTTP.
+func SetSecureCookies(secure bool) { secureCookies = secure }
+
+// SetSessionCookieName overrides the panel session cookie name. The gin session
+// middleware must be registered under the same name for the cookie to read back.
+func SetSessionCookieName(name string) {
+	if name = strings.TrimSpace(name); name != "" {
+		sessionCookieName = name
+	}
+}
+
+// SessionCookieName reports the name the panel session cookie is stored under.
+func SessionCookieName() string { return sessionCookieName }
 
 func init() {
 	gob.Register(model.User{})
@@ -169,7 +192,7 @@ func ClearSession(c *gin.Context) error {
 	if cookiePath == "" {
 		cookiePath = "/"
 	}
-	secure := c.Request.TLS != nil
+	secure := c.Request.TLS != nil || secureCookies
 	s.Options(sessions.Options{
 		Path:     cookiePath,
 		MaxAge:   -1,
