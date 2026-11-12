@@ -66,7 +66,10 @@ jobs:
           sudo apt-get update
           case "${{ matrix.platform }}" in
             amd64) sudo apt-get install -y --no-install-recommends gcc libc6-dev ;;
-            arm64) sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu ;;
+            # libc6-dev-arm64-cross is only a Recommends of gcc-aarch64-linux-gnu,
+            # so --no-install-recommends drops it and cgo then includes the host's
+            # x86 headers ("bits/libc-header-start.h: No such file").
+            arm64) sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross ;;
             *) echo "unsupported platform ${{ matrix.platform }}"; exit 1 ;;
           esac
 
