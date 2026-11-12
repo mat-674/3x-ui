@@ -18,6 +18,7 @@ export class AllSetting {
   edgeKeyFile = '';
   edgeNginxBin = '';
   edgeProxyProtocol = true;
+  edgeHTTPPort = 0;
   firewallSSHPort = 0;
   firewallManageSSH = false;
   firewallAllow = '';

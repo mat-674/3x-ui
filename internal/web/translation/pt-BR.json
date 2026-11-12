@@ -1939,6 +1939,8 @@
       "subHostSortHosts": "Ordem dos hosts",
       "subHostSortModeDesc": "Segue a ordem da página de hosts entre diferentes entradas. Define a ordem emitida pelo servidor; os aplicativos clientes podem aplicar sua própria ordenação.",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "Aplicar grava a configuração gerada, executa nginx -t e carrega só o que o nginx aceitou. Parar encerra o perímetro de forma ordenada.",
         "actionsTitle": "Aplicar e parar",
         "applied": "O perímetro está rodando a nova configuração.",

@@ -6,8 +6,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
@@ -28,6 +30,9 @@ type EdgeSettings struct {
 	KeyFile       string
 	NginxBin      string
 	ProxyProtocol bool
+	// HTTPPort is the public plaintext port for ACME validation and the HTTPS
+	// redirect; 0 leaves it off.
+	HTTPPort int
 }
 
 // ErrNginxMissing reports that the perimeter cannot start because the binary is
@@ -83,6 +88,9 @@ func (s *SettingService) GetEdgeSettings() (EdgeSettings, error) {
 	if es.ProxyProtocol, err = s.getBool("edgeProxyProtocol"); err != nil {
 		return es, err
 	}
+	if es.HTTPPort, err = s.getInt("edgeHTTPPort"); err != nil {
+		return es, err
+	}
 	return es, nil
 }
 
@@ -110,6 +118,8 @@ func (s *SettingService) BuildEdgeConfig() (edge.Config, error) {
 		LogDir:        filepath.Join(stateDir, "logs"),
 		TempDir:       filepath.Join(stateDir, "tmp"),
 		NotFoundFile:  filepath.Join(stateDir, "404.html"),
+		HTTPPort:      settings.HTTPPort,
+		AcmeRoot:      filepath.Join(stateDir, "acme"),
 	}
 
 	names := settings.ServerNames
@@ -229,6 +239,13 @@ func (s *SettingService) ApplyEdge(ctx context.Context) error {
 	if err := os.MkdirAll(cfg.TempDir, 0o750); err != nil {
 		return err
 	}
+	// The challenge directory has to exist before nginx starts: without it the
+	// location resolves to a 404 and a renewal fails for a reason nobody expects.
+	if cfg.HTTPPort > 0 {
+		if err := os.MkdirAll(filepath.Join(cfg.AcmeRoot, ".well-known", "acme-challenge"), 0o755); err != nil {
+			return err
+		}
+	}
 	// Naming the missing binary here beats letting `nginx -t` fail with a bare
 	// exec error: the UI turns this into an install button.
 	installer := edge.NewInstaller(mustString(s.getString("edgeNginxBin")))
@@ -246,7 +263,35 @@ func (s *SettingService) ApplyEdge(ctx context.Context) error {
 		Listen:     cfg.Listen,
 		Port:       cfg.Port,
 	}
+	// A taken plaintext port makes nginx refuse to start, which would take the
+	// whole perimeter down; refuse the apply instead and name what holds it.
+	if err := checkHTTPPortFree(mgr, cfg); err != nil {
+		return err
+	}
 	return mgr.Apply(ctx, cfg)
+}
+
+// checkHTTPPortFree refuses an apply whose plaintext port something else already
+// owns. A running perimeter that owns the socket is not a conflict: reload keeps
+// the listener, so that case is left alone.
+func checkHTTPPortFree(mgr *edge.Manager, cfg edge.Config) error {
+	if cfg.HTTPPort <= 0 {
+		return nil
+	}
+	addr := net.JoinHostPort(cfg.HTTPListen, strconv.Itoa(cfg.HTTPPort))
+	if strings.TrimSpace(cfg.HTTPListen) == "" {
+		addr = net.JoinHostPort("0.0.0.0", strconv.Itoa(cfg.HTTPPort))
+	}
+	probe, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
+	if err == nil {
+		_ = probe.Close()
+		return nil
+	}
+	if mgr.Running() {
+		// The socket is ours; a reload reuses it.
+		return nil
+	}
+	return fmt.Errorf("edge: port %d cannot be bound (%w): stop whatever owns it, or set edgeHTTPPort to 0", cfg.HTTPPort, err)
 }
 
 // EdgeManager returns the manager for status and lifecycle calls.
@@ -275,6 +320,7 @@ func (s *SettingService) EdgeStatus() (entity.EdgeStatus, error) {
 	st.Enabled = settings.Enable
 	st.Listen = settings.Listen
 	st.Port = settings.Port
+	st.HTTPPort = settings.HTTPPort
 	if leaf := certLeaf(settings.CertFile); leaf != nil {
 		st.CertDomains = leaf.DNSNames
 		st.CertNotAfter = leaf.NotAfter.UTC().Format("2006-01-02T15:04:05Z")

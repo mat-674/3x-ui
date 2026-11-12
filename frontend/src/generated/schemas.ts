@@ -46,6 +46,11 @@ export const SCHEMAS: Record<string, unknown> = {
         "description": "nginx perimeter behind the REALITY fallback.",
         "type": "boolean"
       },
+      "edgeHTTPPort": {
+        "maximum": 65535,
+        "minimum": 0,
+        "type": "integer"
+      },
       "edgeKeyFile": {
         "type": "string"
       },
@@ -658,6 +663,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "discordRunTime",
       "edgeCertFile",
       "edgeEnable",
+      "edgeHTTPPort",
       "edgeKeyFile",
       "edgeListen",
       "edgeNginxBin",
@@ -888,6 +894,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "edgeEnable": {
         "description": "nginx perimeter behind the REALITY fallback.",
         "type": "boolean"
+      },
+      "edgeHTTPPort": {
+        "maximum": 65535,
+        "minimum": 0,
+        "type": "integer"
       },
       "edgeKeyFile": {
         "type": "string"
@@ -1525,6 +1536,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "discordRunTime",
       "edgeCertFile",
       "edgeEnable",
+      "edgeHTTPPort",
       "edgeKeyFile",
       "edgeListen",
       "edgeNginxBin",
@@ -2809,6 +2821,11 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": true,
         "type": "boolean"
       },
+      "httpPort": {
+        "description": "HTTPPort is the public plaintext port serving ACME and the HTTPS redirect;\n0 means the perimeter leaves 80 alone.",
+        "example": 80,
+        "type": "integer"
+      },
       "listen": {
         "example": "127.0.0.1",
         "type": "string"
@@ -2865,6 +2882,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "certNotAfter",
       "configValid",
       "enabled",
+      "httpPort",
       "listen",
       "message",
       "nginxBin",

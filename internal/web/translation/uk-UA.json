@@ -1939,6 +1939,8 @@
       "subHostSortHosts": "Порядок хостів",
       "subHostSortModeDesc": "Використовується порядок зі сторінки хостів для всіх вхідних підключень. Це визначає порядок видачі сервером; клієнтські застосунки можуть сортувати вузли самостійно.",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "«Застосувати» записує згенерований конфіг, запускає nginx -t і завантажує лише той конфіг, який nginx прийняв. «Зупинити» коректно вимикає периметр.",
         "actionsTitle": "Застосувати й зупинити",
         "applied": "Периметр працює з новим конфігом.",

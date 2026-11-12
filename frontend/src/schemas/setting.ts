@@ -28,6 +28,7 @@ export const AllSettingSchema = z
     edgeKeyFile: z.string().optional(),
     edgeNginxBin: z.string().optional(),
     edgeProxyProtocol: z.boolean().optional(),
+    edgeHTTPPort: port.optional(),
     firewallSSHPort: nonNegativeInt.optional(),
     firewallManageSSH: z.boolean().optional(),
     firewallAllow: z.string().optional(),

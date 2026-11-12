@@ -2060,6 +2060,8 @@
       "subHostSortHosts": "Hosts order",
       "subHostSortModeDesc": "Hosts order follows the Hosts page across inbounds. This controls the order emitted by the server; client apps may apply their own sorting.",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "Apply writes the generated config, runs nginx -t and loads only what nginx accepted. Stop shuts the perimeter down gracefully.",
         "actionsTitle": "Apply and stop",
         "applied": "The perimeter is running the new config.",

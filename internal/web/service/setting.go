@@ -88,6 +88,9 @@ var defaultValueMap = map[string]string{
 	"edgeKeyFile":       "",
 	"edgeNginxBin":      "",
 	"edgeProxyProtocol": "true",
+	// The plaintext port. 0 keeps it off, because a host where something else
+	// already owns 80 would otherwise fail to start nginx at all.
+	"edgeHTTPPort": "0",
 	// nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the
 	// firewall alone, which is the only safe default: it cannot know how the
 	// operator reaches the box.

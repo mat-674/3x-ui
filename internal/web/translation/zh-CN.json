@@ -1939,6 +1939,8 @@
       "subHostSortHosts": "主机顺序",
       "subHostSortModeDesc": "跨入站使用主机页面中的排序。此设置决定服务器输出顺序；客户端应用仍可能自行排序。",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "应用会写入生成的配置，运行 nginx -t，并且只加载 nginx 接受的配置。停止会优雅地关闭边界代理。",
         "actionsTitle": "应用与停止",
         "applied": "边界代理正在使用新配置运行。",

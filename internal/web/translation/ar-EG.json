@@ -1939,6 +1939,8 @@
       "subHostSortHosts": "ترتيب المضيفين",
       "subHostSortModeDesc": "يتبع ترتيب المضيفين صفحة المضيفين عبر جميع الاتصالات الواردة. يحدد هذا ترتيب مخرجات الخادم؛ وقد تطبق تطبيقات العميل ترتيبًا آخر.",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "التطبيق يكتب الإعدادات المولَّدة، ويشغّل nginx -t، ولا يحمّل إلا الإعدادات التي قبلها nginx. الإيقاف يوقف المحيط بأمان.",
         "actionsTitle": "تطبيق وإيقاف",
         "applied": "المحيط يعمل بالإعدادات الجديدة.",

@@ -1939,6 +1939,8 @@
       "subHostSortHosts": "ホスト順",
       "subHostSortModeDesc": "異なるインバウンド間でもホストページの順序に従います。サーバーが出力する順序を指定しますが、クライアントアプリが独自に並べ替える場合があります。",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "適用は生成された設定を書き込み、nginx -t を実行し、nginx が受け入れた設定だけを読み込みます。停止はペリメータを安全に停止します。",
         "actionsTitle": "適用と停止",
         "applied": "ペリメータは新しい設定で動作しています。",

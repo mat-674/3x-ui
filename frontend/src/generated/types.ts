@@ -23,6 +23,7 @@ export interface AllSetting {
   discordRunTime: string;
   edgeCertFile: string;
   edgeEnable: boolean;
+  edgeHTTPPort: number;
   edgeKeyFile: string;
   edgeListen: string;
   edgeNginxBin: string;
@@ -221,6 +222,7 @@ export interface AllSettingView {
   discordRunTime: string;
   edgeCertFile: string;
   edgeEnable: boolean;
+  edgeHTTPPort: number;
   edgeKeyFile: string;
   edgeListen: string;
   edgeNginxBin: string;
@@ -641,6 +643,7 @@ export interface EdgeStatus {
   certNotAfter: string;
   configValid: boolean;
   enabled: boolean;
+  httpPort: number;
   listen: string;
   message: string;
   nginxBin: string;

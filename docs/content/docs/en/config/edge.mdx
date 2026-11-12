@@ -118,6 +118,7 @@ setting keys (the same names the REST API uses).
 | `edgeKeyFile`         | _(empty)_      | Private key. Empty reuses the panel's `webKeyFile`.                                              |
 | `edgeNginxBin`        | _(empty)_      | Path to the nginx executable. Empty runs `nginx` from `PATH`.                                     |
 | `edgeProxyProtocol`   | `true`         | Expect a PROXY protocol header from Xray. Must match the REALITY inbound's `xver` — see below.     |
+| `edgeHTTPPort`        | `0`            | Plaintext port served alongside TLS: ACME validation plus a redirect to HTTPS. `0` leaves it off. |
 
 Related settings the generated config reads:
 
@@ -231,6 +232,33 @@ the panel itself.
   TLS-ALPN-01 needs to hold 443 itself, which Xray already does. Use **DNS-01** —
   `x-ui` menu **`21 — Cloudflare SSL Certificate`**, or any other ACME client
   with a DNS challenge. See [SSL certificates](/docs/config/ssl-certificates).
+</Callout>
+
+### Serving port 80
+
+The simplest way out of that corner is to let the perimeter own port 80. Set
+`edgeHTTPPort` to `80` and the generated config gains a second server block that
+answers ACME challenges from `<state dir>/acme` and redirects everything else to
+HTTPS. Renewal then runs as a plain webroot request and no firewall rule has to
+be touched again:
+
+```bash
+~/.acme.sh/acme.sh --issue -d site.example --webroot /etc/x-ui/edge/acme
+```
+
+This also looks more like a real site: an HTTPS server whose port 80 stays silent
+is a mild signal of its own, while a redirect is what ordinary hosting does. The
+block carries `server_tokens off` and serves nothing but the challenge directory,
+so it adds no surface — and never proxies the panel or the subscription.
+
+Apply refuses the config when the port is already taken by something else, naming
+the port, rather than letting nginx fail to start and take the whole perimeter
+down. Set `edgeHTTPPort` back to `0` to drop the block again.
+
+<Callout type="info">
+  Plain TLS traffic on port 80 cannot carry REALITY: the fallback is the whole
+  point of 443, and Xray's REALITY listener needs a TLS handshake to proxy. What
+  port 80 can carry is HTTP — the challenge and the redirect above.
 </Callout>
 
 ## Set it up

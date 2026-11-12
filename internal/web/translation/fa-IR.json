@@ -1939,6 +1939,8 @@
       "subHostSortHosts": "ترتیب میزبان‌ها",
       "subHostSortModeDesc": "ترتیب میزبان‌ها در صفحهٔ میزبان‌ها، میان همهٔ ورودی‌ها اعمال می‌شود. این تنظیم ترتیب خروجی سرور را تعیین می‌کند؛ برنامهٔ کلاینت ممکن است ترتیب دیگری اعمال کند.",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "اعمال، پیکربندی تولیدشده را می‌نویسد، nginx -t را اجرا می‌کند و فقط پیکربندی‌ای را بار می‌کند که nginx پذیرفته باشد. توقف، محیط را به‌صورت تمیز خاموش می‌کند.",
         "actionsTitle": "اعمال و توقف",
         "applied": "محیط با پیکربندی جدید در حال اجراست.",

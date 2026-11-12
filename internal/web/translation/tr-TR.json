@@ -1939,6 +1939,8 @@
       "subHostSortHosts": "Ana bilgisayar sırası",
       "subHostSortModeDesc": "Farklı gelen bağlantılarda Ana Bilgisayarlar sayfasının sırasını izler. Sunucunun çıktı sırasını belirler; istemci uygulamaları kendi sıralamalarını uygulayabilir.",
       "edge": {
+        "httpPort": "Port 80",
+        "httpPortDesc": "Public HTTP port for ACME validation and the redirect to HTTPS. 0 leaves it alone. With it, certificate renewal works through a webroot and no firewall rule has to change.",
         "actionsDesc": "Uygula, üretilen yapılandırmayı yazar, nginx -t çalıştırır ve yalnızca nginx’in kabul ettiği yapılandırmayı yükler. Durdur, çevre birimini düzgün şekilde kapatır.",
         "actionsTitle": "Uygula ve durdur",
         "applied": "Çevre birimi yeni yapılandırmayla çalışıyor.",

@@ -45,6 +45,14 @@ type Config struct {
 	PidFile string
 	LogDir  string
 	TempDir string
+
+	// HTTPPort is the public plaintext port: ACME validation plus the redirect to
+	// HTTPS. 0 disables the block, which leaves a host that has no port 80.
+	HTTPPort int
+	// HTTPListen is its bind address; "" binds every interface.
+	HTTPListen string
+	// AcmeRoot is the webroot that /.well-known/acme-challenge/ is served from.
+	AcmeRoot string
 }
 
 // Render produces the full nginx configuration. Everything that reaches a client
@@ -122,6 +130,27 @@ func Render(cfg Config) (string, error) {
 	w("            try_files $uri $uri/ =404;")
 	w("        }")
 	w("    }")
+
+	if cfg.HTTPPort > 0 {
+		w("")
+		// A real site answers on 80 and redirects; a host where 80 is silent is
+		// itself a signal. The challenge path is served before the redirect so a
+		// renewal never needs the firewall touched.
+		w("    server {")
+		w("        listen %s;", cfg.httpListenLine())
+		w("        server_name %s;", strings.Join(cfg.ServerNames, " "))
+		w("        server_tokens off;")
+		w("")
+		w("        location ^~ /.well-known/acme-challenge/ {")
+		w("            root %s;", cfg.AcmeRoot)
+		w("            default_type text/plain;")
+		w("        }")
+		w("")
+		w("        location / {")
+		w("            return 301 https://$host$request_uri;")
+		w("        }")
+		w("    }")
+	}
 	w("}")
 
 	return b.String(), nil
@@ -157,6 +186,17 @@ func (c Config) listenLine() string {
 	return line
 }
 
+// httpListenLine renders the plaintext listener: a bare port binds every
+// interface, which is what a public site needs.
+func (c Config) httpListenLine() string {
+	listen := strings.TrimSpace(c.HTTPListen)
+	switch listen {
+	case "", "0.0.0.0":
+		return strconv.Itoa(c.HTTPPort)
+	}
+	return net.JoinHostPort(listen, strconv.Itoa(c.HTTPPort))
+}
+
 func (c Config) validate() error {
 	switch {
 	case c.Port <= 0 || c.Port > 65535:
@@ -175,6 +215,17 @@ func (c Config) validate() error {
 		return fmt.Errorf("edge: panel upstream is required")
 	case !validPrefix(c.PanelPrefix):
 		return fmt.Errorf("edge: panel prefix %q is not an absolute path", c.PanelPrefix)
+	}
+	if c.HTTPPort != 0 {
+		if c.HTTPPort < 0 || c.HTTPPort > 65535 {
+			return fmt.Errorf("edge: http port %d out of range", c.HTTPPort)
+		}
+		if c.HTTPPort == c.Port {
+			return fmt.Errorf("edge: the plaintext and TLS ports cannot both be %d", c.Port)
+		}
+		if strings.TrimSpace(c.AcmeRoot) == "" {
+			return fmt.Errorf("edge: an ACME webroot is required when port %d is served", c.HTTPPort)
+		}
 	}
 	for _, p := range c.SubPrefixes {
 		if !validPrefix(p) {

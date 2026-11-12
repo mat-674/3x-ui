@@ -72,6 +72,11 @@
             "description": "nginx perimeter behind the REALITY fallback.",
             "type": "boolean"
           },
+          "edgeHTTPPort": {
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
           "edgeKeyFile": {
             "type": "string"
           },
@@ -684,6 +689,7 @@
           "discordRunTime",
           "edgeCertFile",
           "edgeEnable",
+          "edgeHTTPPort",
           "edgeKeyFile",
           "edgeListen",
           "edgeNginxBin",
@@ -914,6 +920,11 @@
           "edgeEnable": {
             "description": "nginx perimeter behind the REALITY fallback.",
             "type": "boolean"
+          },
+          "edgeHTTPPort": {
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
           },
           "edgeKeyFile": {
             "type": "string"
@@ -1551,6 +1562,7 @@
           "discordRunTime",
           "edgeCertFile",
           "edgeEnable",
+          "edgeHTTPPort",
           "edgeKeyFile",
           "edgeListen",
           "edgeNginxBin",
@@ -2835,6 +2847,11 @@
             "example": true,
             "type": "boolean"
           },
+          "httpPort": {
+            "description": "HTTPPort is the public plaintext port serving ACME and the HTTPS redirect;\n0 means the perimeter leaves 80 alone.",
+            "example": 80,
+            "type": "integer"
+          },
           "listen": {
             "example": "127.0.0.1",
             "type": "string"
@@ -2891,6 +2908,7 @@
           "certNotAfter",
           "configValid",
           "enabled",
+          "httpPort",
           "listen",
           "message",
           "nginxBin",
@@ -17674,6 +17692,7 @@
                     "certNotAfter": "2027-03-02T10:04:05Z",
                     "configValid": true,
                     "enabled": true,
+                    "httpPort": 80,
                     "listen": "127.0.0.1",
                     "message": "",
                     "nginxBin": "/usr/sbin/nginx",

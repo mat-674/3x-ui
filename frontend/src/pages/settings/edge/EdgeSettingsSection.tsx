@@ -57,6 +57,20 @@ export default function EdgeSettingsSection({
 
       <SettingListItem
         paddings="small"
+        title={t('pages.settings.edge.httpPort')}
+        description={t('pages.settings.edge.httpPortDesc')}
+      >
+        <InputNumber
+          value={allSetting.edgeHTTPPort}
+          min={0}
+          max={65535}
+          style={{ width: '100%' }}
+          onChange={onNumber((v) => updateSetting({ edgeHTTPPort: v }))}
+        />
+      </SettingListItem>
+
+      <SettingListItem
+        paddings="small"
         title={t('pages.settings.edge.serverNames')}
         description={t('pages.settings.edge.serverNamesDesc')}
       >

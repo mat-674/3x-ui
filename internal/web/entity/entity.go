@@ -38,6 +38,7 @@ type AllSetting struct {
 	EdgeKeyFile       string `json:"edgeKeyFile" form:"edgeKeyFile"`
 	EdgeNginxBin      string `json:"edgeNginxBin" form:"edgeNginxBin"`
 	EdgeProxyProtocol bool   `json:"edgeProxyProtocol" form:"edgeProxyProtocol"`
+	EdgeHTTPPort      int    `json:"edgeHTTPPort" form:"edgeHTTPPort" validate:"gte=0,lte=65535"`
 	// nftables firewall. SSHPort 0 with manageSSH off means the panel leaves the
 	// firewall untouched.
 	FirewallSSHPort       int    `json:"firewallSSHPort" form:"firewallSSHPort" validate:"gte=0,lte=65535"`
@@ -246,9 +247,12 @@ type EdgeStatus struct {
 	ServerNames   []string `json:"serverNames"`
 	PanelUpstream string   `json:"panelUpstream" example:"127.0.0.1:2053"`
 	SubPrefixes   int      `json:"subPrefixes" example:"3"`
-	CertDomains   []string `json:"certDomains"`
-	CertNotAfter  string   `json:"certNotAfter" example:"2027-03-02T10:04:05Z"`
-	Message       string   `json:"message" example:""`
+	// HTTPPort is the public plaintext port serving ACME and the HTTPS redirect;
+	// 0 means the perimeter leaves 80 alone.
+	HTTPPort     int      `json:"httpPort" example:"80"`
+	CertDomains  []string `json:"certDomains"`
+	CertNotAfter string   `json:"certNotAfter" example:"2027-03-02T10:04:05Z"`
+	Message      string   `json:"message" example:""`
 	// NginxInstalled drives the install button: without the binary nothing else
 	// on the page can work, so the UI has to know before an apply is attempted.
 	NginxInstalled bool   `json:"nginxInstalled" example:"true"`

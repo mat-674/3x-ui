@@ -31,6 +31,14 @@ _openapi:
         SSH still answer. A stale or foreign deadline id is refused, so an old
         confirmation cannot disarm a newer apply.
       url: '#retire-the-pending-rollback-once-the-operator-has-verified-the-panel-and-ssh-still-answer-a-stale-or-foreign-deadline-id-is-refused-so-an-old-confirmation-cannot-disarm-a-newer-apply'
+    - depth: 2
+      title: Install the nginx binary through the distribution package manager, then
+        stop and disable the packaged unit so its default site does not claim
+        port 80. Refused inside a container (the package would vanish with it)
+        and without root, with the reason returned; an existing binary is left
+        untouched. This is what makes the perimeter usable without an
+        install-time flag.
+      url: '#install-the-nginx-binary-through-the-distribution-package-manager-then-stop-and-disable-the-packaged-unit-so-its-default-site-does-not-claim-port-80-refused-inside-a-container-the-package-would-vanish-with-it-and-without-root-with-the-reason-returned-an-existing-binary-is-left-untouched-this-is-what-makes-the-perimeter-usable-without-an-install-time-flag'
   structuredData:
     headings:
       - content: Whether the panel ruleset is loaded, which table it owns, the SSH port
@@ -49,6 +57,13 @@ _openapi:
           and SSH still answer. A stale or foreign deadline id is refused, so an
           old confirmation cannot disarm a newer apply.
         id: retire-the-pending-rollback-once-the-operator-has-verified-the-panel-and-ssh-still-answer-a-stale-or-foreign-deadline-id-is-refused-so-an-old-confirmation-cannot-disarm-a-newer-apply
+      - content: Install the nginx binary through the distribution package manager, then
+          stop and disable the packaged unit so its default site does not claim
+          port 80. Refused inside a container (the package would vanish with it)
+          and without root, with the reason returned; an existing binary is left
+          untouched. This is what makes the perimeter usable without an
+          install-time flag.
+        id: install-the-nginx-binary-through-the-distribution-package-manager-then-stop-and-disable-the-packaged-unit-so-its-default-site-does-not-claim-port-80-refused-inside-a-container-the-package-would-vanish-with-it-and-without-root-with-the-reason-returned-an-existing-binary-is-left-untouched-this-is-what-makes-the-perimeter-usable-without-an-install-time-flag
     contents: []
 ---
 
@@ -59,7 +74,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/firewall/status","method":"get"},{"path":"/panel/api/firewall/config","method":"get"},{"path":"/panel/api/firewall/apply","method":"post"},{"path":"/panel/api/firewall/confirm","method":"post"}]} showTitle />
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/firewall/status","method":"get"},{"path":"/panel/api/firewall/config","method":"get"},{"path":"/panel/api/firewall/apply","method":"post"},{"path":"/panel/api/firewall/confirm","method":"post"},{"path":"/panel/api/edge/install-nginx","method":"post"}]} showTitle />
     </>
   );
 }
