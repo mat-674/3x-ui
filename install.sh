@@ -7,6 +7,13 @@ yellow='\033[0;33m'
 plain='\033[0m'
 
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
+
+# This installer swaps the panel binary for a build that carries the client-side
+# chain feature. The official archive still supplies bin/, the service units
+# and the /usr/bin/x-ui CLI, so only the panel binary is replaced.
+chain_repo="${XUI_CHAIN_REPO:-mat-674/3x-ui}"
+chain_ref="${XUI_CHAIN_REF:-main}"
+chain_tag="${XUI_CHAIN_TAG:-chain-build}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 
 # check root
@@ -1722,6 +1729,153 @@ _install_xui_service_unit() {
     return 0
 }
 
+# Downloads the published chain build for this architecture. Returns 0 only on
+# a real download, so a missing release falls through to the next source.
+chain_binary_from_release() {
+    local dest="$1" url
+    url="https://github.com/${chain_repo}/releases/download/${chain_tag}/x-ui-linux-$(arch)"
+
+    echo -e "Looking for a published chain build: ${url}"
+    if ! curl -fLR --retry 3 --retry-delay 3 --connect-timeout 15 --speed-limit 1 --speed-time 300 \
+        -o "${dest}.part" "${url}" 2>/dev/null; then
+        rm -f "${dest}.part"
+        return 1
+    fi
+    if [[ ! -s "${dest}.part" ]]; then
+        rm -f "${dest}.part"
+        return 1
+    fi
+    verify_release_checksum "${url}" "${dest}.part"
+    mv -f "${dest}.part" "${dest}"
+    return 0
+}
+
+# Builds the panel binary from the chain branch inside Docker and lifts it out
+# of the builder stage, so the host needs no Go, Node or C toolchain. The
+# Dockerfile is generated here rather than taken from the repo: the released one
+# calls `npm ci` bare, which is a known flake (exit 146 / heap exhaustion) on
+# small hosts, so this version retries it and caps Node's heap.
+chain_binary_from_docker() {
+    local dest="$1" work="$2" src df log attempt image name
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${red}No chain build available and Docker is not installed.${plain}" >&2
+        echo "Give the script a ready binary instead:" >&2
+        echo "  XUI_CHAIN_BINARY=/path/to/x-ui bash install.sh" >&2
+        echo "  XUI_CHAIN_BIN_URL=https://... bash install.sh" >&2
+        echo "or install Docker so it can build ${chain_repo}@${chain_ref} here." >&2
+        return 1
+    fi
+
+    src="${work}/src"
+    mkdir -p "${src}" || return 1
+    echo -e "Fetching ${chain_repo}@${chain_ref} ..."
+    if ! curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 300 \
+        -o "${work}/src.tar.gz" \
+        "https://codeload.github.com/${chain_repo}/tar.gz/refs/heads/${chain_ref}" 2>/dev/null; then
+        curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 300 \
+            -o "${work}/src.tar.gz" \
+            "https://codeload.github.com/${chain_repo}/tar.gz/refs/tags/${chain_ref}" || return 1
+    fi
+    tar -xzf "${work}/src.tar.gz" -C "${src}" --strip-components=1 || return 1
+
+    df="${work}/Dockerfile.chain"
+    cat > "${df}" <<'DOCKERFILE'
+FROM node:26-alpine AS frontend
+WORKDIR /src/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+# The heap cap has to be in place before npm ci: that is the step that dies.
+ENV NODE_OPTIONS=--max-old-space-size=2048
+# npm ci is retried: on a small host it can die with exit 146 or an OOM while
+# unpacking, and a second attempt over a warm cache almost always succeeds.
+RUN set -eux; \
+    npm config set fetch-retries 8; \
+    npm config set fetch-retry-mintimeout 20000; \
+    npm config set fetch-retry-maxtimeout 180000; \
+    npm ci --no-audit --no-fund || \
+    npm ci --no-audit --no-fund || \
+    npm install --no-audit --no-fund
+COPY frontend/ ./
+COPY internal/web/translation /src/internal/web/translation
+RUN npm run build
+
+FROM golang:1.27-alpine AS builder
+WORKDIR /app
+RUN apk --no-cache --update add build-base gcc curl unzip
+COPY . .
+COPY --from=frontend /src/internal/web/dist ./internal/web/dist
+ENV CGO_ENABLED=1
+ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+RUN go build -ldflags "-w -s" -o build/x-ui main.go
+DOCKERFILE
+
+    log="${work}/build.log"
+    for attempt in 1 2; do
+        image="x-ui-chain-build:$$-${attempt}"
+        name="xui-chain-$$-${attempt}"
+        echo -e "Building the panel binary in Docker (attempt ${attempt} of 2, a few minutes) ..."
+        if ! docker build -q -f "${df}" -t "${image}" --target builder "${src}" >"${log}" 2>&1; then
+            if [[ ${attempt} -eq 1 ]]; then
+                echo -e "${yellow}First build failed, retrying once ...${plain}" >&2
+                continue
+            fi
+            echo -e "${red}Docker build failed. Last lines:${plain}" >&2
+            tail -n 30 "${log}" >&2 || true
+            return 1
+        fi
+        docker create --name "${name}" "${image}" >/dev/null || return 1
+        if ! docker cp "${name}:/app/build/x-ui" "${dest}"; then
+            docker rm -f "${name}" >/dev/null 2>&1
+            return 1
+        fi
+        docker rm -f "${name}" >/dev/null 2>&1
+        docker rmi "${image}" >/dev/null 2>&1 || true
+        return 0
+    done
+    return 1
+}
+
+# Puts the chain build in place of the release binary. Sources, in order: a
+# local file, an explicit URL, the published release asset, a Docker build.
+chain_binary_install() {
+    local dest="${xui_folder}/x-ui" work
+
+    work=$(mktemp -d) || { echo -e "${red}mktemp failed${plain}" >&2; exit 1; }
+
+    if [[ -n "${XUI_CHAIN_BINARY:-}" ]]; then
+        echo -e "Installing the chain build from ${XUI_CHAIN_BINARY}"
+        if ! cp -f "${XUI_CHAIN_BINARY}" "${dest}"; then
+            rm -rf "${work}"
+            echo -e "${red}Failed to copy ${XUI_CHAIN_BINARY}${plain}" >&2
+            exit 1
+        fi
+    elif [[ -n "${XUI_CHAIN_BIN_URL:-}" ]]; then
+        echo -e "Downloading the chain build from ${XUI_CHAIN_BIN_URL}"
+        if ! curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 --speed-limit 1 --speed-time 300 \
+            -o "${dest}.part" "${XUI_CHAIN_BIN_URL}"; then
+            rm -f "${dest}.part"
+            rm -rf "${work}"
+            echo -e "${red}Downloading the chain build failed${plain}" >&2
+            exit 1
+        fi
+        mv -f "${dest}.part" "${dest}"
+    elif chain_binary_from_release "${dest}"; then
+        : # the published asset is already in place
+    elif chain_binary_from_docker "${dest}" "${work}"; then
+        : # built here
+    else
+        rm -rf "${work}"
+        echo -e "${red}This installer needs the chain build and could not obtain it.${plain}" >&2
+        exit 1
+    fi
+
+    chmod +x "${dest}"
+    if ! "${dest}" -v >/dev/null 2>&1; then
+        echo -e "${yellow}Warning: the installed panel binary did not answer -v; check it before relying on the panel${plain}" >&2
+    fi
+    rm -rf "${work}"
+}
+
 # resolve_latest_tag prints the latest stable release tag. It prefers the web
 # releases/latest redirect, which is not subject to the unauthenticated API's
 # 60 req/h-per-IP limit that trips shared CI/CGNAT addresses (the install then
@@ -1985,6 +2139,7 @@ install_x-ui() {
     fi
     chmod +x /usr/bin/x-ui
     mkdir -p /var/log/x-ui
+    chain_binary_install
     config_after_install
 
     # Etckeeper compatibility
